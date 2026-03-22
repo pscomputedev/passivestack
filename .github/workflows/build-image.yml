@@ -1,0 +1,64 @@
+name: Build PassiveStack Pi Image
+
+on:
+  push:
+    branches: [ main ]
+    paths:
+      - 'config/**'
+      - 'install.sh'
+      - 'bootstrap.sh'
+      - '.github/workflows/build-image.yml'
+  workflow_dispatch:  # Manueller Start über GitHub UI
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    timeout-minutes: 120
+
+    steps:
+      - name: Repository auschecken
+        uses: actions/checkout@v4
+
+      - name: PassiveStack Pi-Image bauen
+        uses: usimd/pi-gen-action@v1
+        id: build
+        with:
+          # Image-Name
+          image-name: PassiveStack-v1.3
+
+          # Raspberry Pi OS Lite (kein Desktop)
+          stage-list: stage0 stage1 stage2 stage-passivestack
+
+          # Deutsch, Berlin, Bookworm
+          locale: de_DE.UTF-8
+          timezone: Europe/Berlin
+          keyboard-keymap: de
+          keyboard-layout: German
+
+          # Standard Pi-User
+          username: pi
+          password: passivestack
+
+          # SSH aktivieren
+          enable-ssh: 1
+
+          # Hostname
+          hostname: passivestack
+
+          # Komprimierung
+          compression: xz
+          compression-level: 6
+
+          # pi-gen Version
+          pi-gen-version: arm64/2024-11-19-raspios-bookworm
+
+          # Extra Stage mit PassiveStack
+          extra-host-dependencies: ''
+          extra-host-modules: ''
+
+      - name: Image hochladen als Artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: PassiveStack-Pi-Image
+          path: ${{ steps.build.outputs.image-path }}
+          retention-days: 90
