@@ -50,7 +50,7 @@ jobs:
           compression-level: 6
 
           # pi-gen Version
-          pi-gen-version: master
+          pi-gen-version: arm64
 
           # Extra Stage mit PassiveStack
           extra-host-dependencies: ''
