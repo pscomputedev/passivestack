@@ -50,7 +50,7 @@ jobs:
           compression-level: 6
 
           # pi-gen Version
-          pi-gen-version: arm64/2024-11-19-raspios-bookworm
+          pi-gen-version: master
 
           # Extra Stage mit PassiveStack
           extra-host-dependencies: ''
