@@ -1,0 +1,936 @@
+<!DOCTYPE html>
+<html lang="de">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>PassiveCompute.de — Solar-powered passive income</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Syne:wght@400;600;700;800&family=DM+Mono:wght@300;400;500&family=Inter:wght@300;400;500&display=swap" rel="stylesheet">
+<style>
+  :root {
+    --bg: #0a0a0b;
+    --bg2: #111114;
+    --bg3: #18181d;
+    --solar: #f5a623;
+    --solar2: #ff7a00;
+    --solar3: #ffd166;
+    --green: #06d6a0;
+    --text: #e8e8f0;
+    --text2: #9090a8;
+    --text3: #5a5a70;
+    --border: rgba(245,166,35,0.15);
+    --border2: rgba(255,255,255,0.06);
+    --glow: 0 0 40px rgba(245,166,35,0.15);
+  }
+  *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+  html { scroll-behavior: smooth; }
+  body { font-family: 'Inter', sans-serif; background: var(--bg); color: var(--text); overflow-x: hidden; line-height: 1.6; }
+  body::before { content: ''; position: fixed; inset: 0; background-image: url("data:image/svg+xml,%3Csvg viewBox='0 0 256 256' xmlns='http://www.w3.org/2000/svg'%3E%3Cfilter id='noise'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.9' numOctaves='4' stitchTiles='stitch'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23noise)' opacity='0.04'/%3E%3C/svg%3E"); pointer-events: none; z-index: 1000; opacity: 0.4; }
+
+  nav { position: fixed; top: 0; left: 0; right: 0; z-index: 100; padding: 1.2rem 4rem; display: flex; align-items: center; justify-content: space-between; background: rgba(10,10,11,0.9); backdrop-filter: blur(20px); border-bottom: 1px solid var(--border2); }
+  .logo { font-family: 'Syne', sans-serif; font-weight: 800; font-size: 1.3rem; color: var(--text); text-decoration: none; }
+  .logo span { color: var(--solar); }
+  .nav-links { display: flex; gap: 2rem; list-style: none; align-items: center; }
+  .nav-links a { color: var(--text2); text-decoration: none; font-size: 0.875rem; font-weight: 500; transition: color 0.2s; }
+  .nav-links a:hover { color: var(--solar); }
+  .lang-toggle { display: flex; gap: 0.5rem; }
+  .lang-btn { background: none; border: 1px solid var(--border2); color: var(--text2); padding: 0.25rem 0.75rem; border-radius: 4px; font-size: 0.75rem; cursor: pointer; font-family: 'DM Mono', monospace; transition: all 0.2s; }
+  .lang-btn.active { background: var(--solar); color: #000; border-color: var(--solar); font-weight: 500; }
+
+  .hero { min-height: 100vh; display: flex; align-items: center; justify-content: center; position: relative; padding: 8rem 4rem 4rem; overflow: hidden; }
+  .hero-bg { position: absolute; inset: 0; background: radial-gradient(ellipse 80% 50% at 50% -20%, rgba(245,166,35,0.12) 0%, transparent 60%), radial-gradient(ellipse 40% 40% at 80% 60%, rgba(255,122,0,0.06) 0%, transparent 50%); }
+  .hero-grid { position: absolute; inset: 0; background-image: linear-gradient(rgba(245,166,35,0.04) 1px, transparent 1px), linear-gradient(90deg, rgba(245,166,35,0.04) 1px, transparent 1px); background-size: 60px 60px; mask-image: radial-gradient(ellipse 80% 60% at 50% 0%, black, transparent); }
+  .hero-content { position: relative; text-align: center; max-width: 960px; }
+  .hero-badge { display: inline-flex; align-items: center; gap: 0.5rem; background: rgba(245,166,35,0.1); border: 1px solid rgba(245,166,35,0.3); border-radius: 100px; padding: 0.4rem 1rem; font-family: 'DM Mono', monospace; font-size: 0.75rem; color: var(--solar); margin-bottom: 2rem; animation: fadeInDown 0.6s ease both; }
+  .hero-badge::before { content: ''; width: 6px; height: 6px; border-radius: 50%; background: var(--green); animation: pulse 2s infinite; }
+  @keyframes pulse { 0%, 100% { opacity: 1; box-shadow: 0 0 0 0 rgba(6,214,160,0.4); } 50% { opacity: 0.8; box-shadow: 0 0 0 6px rgba(6,214,160,0); } }
+  .hero h1 { font-family: 'Syne', sans-serif; font-size: clamp(3rem, 7vw, 5.5rem); font-weight: 800; line-height: 1.05; margin-bottom: 1.5rem; animation: fadeInUp 0.7s 0.1s ease both; }
+  .hero h1 em { font-style: normal; background: linear-gradient(135deg, var(--solar), var(--solar2)); -webkit-background-clip: text; -webkit-text-fill-color: transparent; background-clip: text; }
+  .hero-sub { font-size: 1.15rem; color: var(--text2); max-width: 640px; margin: 0 auto 2.5rem; line-height: 1.8; animation: fadeInUp 0.7s 0.2s ease both; }
+  .hero-cta { display: flex; gap: 1rem; justify-content: center; flex-wrap: wrap; animation: fadeInUp 0.7s 0.3s ease both; }
+  .btn-primary { background: linear-gradient(135deg, var(--solar), var(--solar2)); color: #000; border: none; padding: 0.9rem 2rem; border-radius: 8px; font-weight: 700; font-size: 0.95rem; cursor: pointer; text-decoration: none; display: inline-flex; align-items: center; gap: 0.5rem; transition: all 0.2s; font-family: 'Syne', sans-serif; }
+  .btn-primary:hover { transform: translateY(-2px); box-shadow: 0 8px 30px rgba(245,166,35,0.4); }
+  .btn-secondary { background: transparent; color: var(--text); border: 1px solid var(--border2); padding: 0.9rem 2rem; border-radius: 8px; font-weight: 500; font-size: 0.95rem; cursor: pointer; text-decoration: none; display: inline-flex; align-items: center; gap: 0.5rem; transition: all 0.2s; }
+  .btn-secondary:hover { border-color: var(--solar); color: var(--solar); }
+
+  .stats-bar { background: var(--bg2); border-top: 1px solid var(--border2); border-bottom: 1px solid var(--border2); padding: 2rem 4rem; display: flex; justify-content: center; gap: 4rem; flex-wrap: wrap; }
+  .stat { text-align: center; }
+  .stat-value { font-family: 'Syne', sans-serif; font-size: 2rem; font-weight: 800; color: var(--solar); display: block; }
+  .stat-label { font-size: 0.75rem; color: var(--text3); text-transform: uppercase; letter-spacing: 0.1em; font-family: 'DM Mono', monospace; }
+
+  section { padding: 6rem 4rem; max-width: 1200px; margin: 0 auto; }
+  .section-label { font-family: 'DM Mono', monospace; font-size: 0.75rem; color: var(--solar); text-transform: uppercase; letter-spacing: 0.15em; margin-bottom: 1rem; display: block; }
+  .section-title { font-family: 'Syne', sans-serif; font-size: clamp(2rem, 4vw, 3rem); font-weight: 800; line-height: 1.1; margin-bottom: 1.5rem; }
+  .section-sub { font-size: 1.05rem; color: var(--text2); max-width: 700px; line-height: 1.8; }
+
+  /* DISCLAIMER BOX */
+  .disclaimer-box {
+    background: rgba(245,166,35,0.06);
+    border: 1px solid rgba(245,166,35,0.25);
+    border-left: 4px solid var(--solar);
+    border-radius: 12px;
+    padding: 2rem 2.5rem;
+    margin-top: 3rem;
+    display: flex;
+    gap: 1.5rem;
+    align-items: flex-start;
+  }
+  .disclaimer-icon { font-size: 2rem; flex-shrink: 0; margin-top: 0.1rem; }
+  .disclaimer-title { font-family: 'Syne', sans-serif; font-size: 1.1rem; font-weight: 700; color: var(--solar); margin-bottom: 0.75rem; }
+  .disclaimer-text { font-size: 0.9rem; color: var(--text2); line-height: 1.7; }
+
+  /* MARKET STATS */
+  .market-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(200px, 1fr)); gap: 1rem; margin-top: 2.5rem; }
+  .market-card { background: var(--bg2); border: 1px solid var(--border2); border-radius: 12px; padding: 1.5rem; text-align: center; transition: border-color 0.3s; }
+  .market-card:hover { border-color: rgba(245,166,35,0.3); }
+  .market-num { font-family: 'Syne', sans-serif; font-size: 1.8rem; font-weight: 800; color: var(--solar); display: block; margin-bottom: 0.25rem; }
+  .market-desc { font-size: 0.8rem; color: var(--text3); font-family: 'DM Mono', monospace; }
+  .market-source { font-size: 0.7rem; color: var(--text3); margin-top: 0.5rem; opacity: 0.6; }
+
+  .steps { display: grid; grid-template-columns: repeat(auto-fit, minmax(220px, 1fr)); gap: 1.5rem; margin-top: 3rem; }
+  .step { background: var(--bg2); border: 1px solid var(--border2); border-radius: 12px; padding: 2rem; position: relative; overflow: hidden; transition: border-color 0.3s; }
+  .step:hover { border-color: rgba(245,166,35,0.4); }
+  .step::before { content: ''; position: absolute; top: 0; left: 0; right: 0; height: 2px; background: linear-gradient(90deg, var(--solar), transparent); opacity: 0; transition: opacity 0.3s; }
+  .step:hover::before { opacity: 1; }
+  .step-num { font-family: 'Syne', sans-serif; font-size: 3rem; font-weight: 800; color: rgba(245,166,35,0.15); line-height: 1; margin-bottom: 1rem; }
+  .step h3 { font-family: 'Syne', sans-serif; font-size: 1.1rem; font-weight: 700; margin-bottom: 0.75rem; }
+  .step p { font-size: 0.9rem; color: var(--text2); line-height: 1.6; }
+
+  .tools-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(280px, 1fr)); gap: 1.5rem; margin-top: 3rem; }
+  .tool-card { background: var(--bg2); border: 1px solid var(--border2); border-radius: 16px; padding: 1.75rem; display: flex; flex-direction: column; gap: 1rem; position: relative; overflow: hidden; transition: all 0.3s; }
+  .tool-card:hover { transform: translateY(-4px); border-color: rgba(245,166,35,0.3); box-shadow: var(--glow); }
+  .tool-card.featured { border-color: rgba(245,166,35,0.3); background: linear-gradient(135deg, rgba(245,166,35,0.04), var(--bg2)); }
+  .tool-header { display: flex; align-items: flex-start; justify-content: space-between; gap: 1rem; }
+  .tool-icon { width: 48px; height: 48px; border-radius: 10px; display: flex; align-items: center; justify-content: center; font-size: 1.5rem; background: rgba(245,166,35,0.1); flex-shrink: 0; }
+  .tool-badge { font-family: 'DM Mono', monospace; font-size: 0.7rem; padding: 0.25rem 0.6rem; border-radius: 4px; background: rgba(6,214,160,0.15); color: var(--green); border: 1px solid rgba(6,214,160,0.3); }
+  .tool-badge.bandwidth { background: rgba(99,179,237,0.15); color: #63b3ed; border-color: rgba(99,179,237,0.3); }
+  .tool-badge.gpu { background: rgba(245,166,35,0.15); color: var(--solar); border-color: rgba(245,166,35,0.3); }
+  .tool-badge.depin { background: rgba(167,139,250,0.15); color: #a78bfa; border-color: rgba(167,139,250,0.3); }
+  .tool-name { font-family: 'Syne', sans-serif; font-size: 1.15rem; font-weight: 700; }
+  .tool-desc { font-size: 0.875rem; color: var(--text2); line-height: 1.6; }
+  .tool-earnings { display: flex; align-items: center; justify-content: space-between; padding: 0.75rem 1rem; background: rgba(0,0,0,0.3); border-radius: 8px; margin-top: auto; }
+  .earnings-label { font-family: 'DM Mono', monospace; font-size: 0.7rem; color: var(--text3); text-transform: uppercase; letter-spacing: 0.05em; }
+  .earnings-value { font-family: 'Syne', sans-serif; font-size: 0.95rem; font-weight: 700; color: var(--solar3); }
+  .referral-link { display: inline-flex; align-items: center; gap: 0.4rem; background: linear-gradient(135deg, var(--solar), var(--solar2)); color: #000; text-decoration: none; font-size: 0.8rem; font-weight: 700; padding: 0.5rem 1rem; border-radius: 6px; width: 100%; justify-content: center; font-family: 'Syne', sans-serif; transition: all 0.2s; }
+  .referral-link:hover { transform: translateY(-1px); box-shadow: 0 4px 20px rgba(245,166,35,0.4); }
+  .referral-bonus { font-size: 0.75rem; color: var(--green); font-family: 'DM Mono', monospace; text-align: center; margin-top: 0.25rem; }
+
+  .income-section { background: var(--bg2); border-radius: 20px; border: 1px solid var(--border2); padding: 3rem; margin-top: 3rem; }
+  .income-table { width: 100%; border-collapse: collapse; margin-top: 1.5rem; }
+  .income-table th { font-family: 'DM Mono', monospace; font-size: 0.7rem; text-transform: uppercase; letter-spacing: 0.1em; color: var(--text3); text-align: left; padding: 0.75rem 1rem; border-bottom: 1px solid var(--border2); }
+  .income-table td { padding: 1rem; font-size: 0.9rem; border-bottom: 1px solid rgba(255,255,255,0.03); }
+  .income-table tr:hover td { background: rgba(245,166,35,0.03); }
+  .income-table .platform { font-weight: 600; }
+  .income-table .amount { font-family: 'Syne', sans-serif; font-weight: 700; color: var(--solar); }
+  .income-table .type-badge { font-family: 'DM Mono', monospace; font-size: 0.7rem; padding: 0.2rem 0.5rem; border-radius: 3px; background: var(--bg3); color: var(--text3); }
+  .total-row td { border-top: 2px solid rgba(245,166,35,0.3) !important; font-family: 'Syne', sans-serif; font-weight: 800; font-size: 1.1rem !important; color: var(--solar) !important; padding-top: 1.25rem !important; }
+
+  .faq-list { margin-top: 2.5rem; display: flex; flex-direction: column; gap: 1rem; }
+  .faq-item { background: var(--bg2); border: 1px solid var(--border2); border-radius: 12px; overflow: hidden; }
+  .faq-question { padding: 1.25rem 1.5rem; cursor: pointer; display: flex; justify-content: space-between; align-items: center; font-weight: 600; font-size: 0.95rem; transition: color 0.2s; user-select: none; }
+  .faq-question:hover { color: var(--solar); }
+  .faq-arrow { color: var(--solar); font-size: 1.2rem; transition: transform 0.3s; flex-shrink: 0; }
+  .faq-item.open .faq-arrow { transform: rotate(45deg); }
+  .faq-answer { max-height: 0; overflow: hidden; transition: max-height 0.4s ease; }
+  .faq-item.open .faq-answer { max-height: 400px; }
+  .faq-answer p { padding: 0 1.5rem 1.25rem; color: var(--text2); font-size: 0.9rem; line-height: 1.7; }
+
+  .guide-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 2rem; margin-top: 3rem; }
+  .guide-card { background: var(--bg2); border: 1px solid var(--border2); border-radius: 16px; padding: 2rem; }
+  .guide-card h3 { font-family: 'Syne', sans-serif; font-size: 1.1rem; font-weight: 700; margin-bottom: 1rem; display: flex; align-items: center; gap: 0.5rem; }
+  .guide-steps { list-style: none; display: flex; flex-direction: column; gap: 0.75rem; }
+  .guide-steps li { display: flex; gap: 0.75rem; font-size: 0.875rem; color: var(--text2); align-items: flex-start; }
+  .guide-steps li::before { content: attr(data-n); width: 22px; height: 22px; border-radius: 50%; background: rgba(245,166,35,0.15); color: var(--solar); font-size: 0.7rem; font-family: 'DM Mono', monospace; display: flex; align-items: center; justify-content: center; flex-shrink: 0; margin-top: 0.1rem; font-weight: 700; }
+
+  footer { background: var(--bg2); border-top: 1px solid var(--border2); padding: 3rem 4rem; display: flex; justify-content: space-between; align-items: center; flex-wrap: wrap; gap: 1rem; }
+  .footer-logo { font-family: 'Syne', sans-serif; font-size: 1.1rem; font-weight: 800; }
+  .footer-logo span { color: var(--solar); }
+  .footer-note { font-size: 0.8rem; color: var(--text3); font-family: 'DM Mono', monospace; }
+  .solar-tag { display: inline-flex; align-items: center; gap: 0.3rem; font-family: 'DM Mono', monospace; font-size: 0.7rem; color: var(--solar); background: rgba(245,166,35,0.08); border: 1px solid rgba(245,166,35,0.2); border-radius: 4px; padding: 0.2rem 0.5rem; }
+
+  @keyframes fadeInDown { from { opacity: 0; transform: translateY(-20px); } to { opacity: 1; transform: translateY(0); } }
+  @keyframes fadeInUp { from { opacity: 0; transform: translateY(30px); } to { opacity: 1; transform: translateY(0); } }
+
+  .de { display: block; } .en { display: none; }
+  body.lang-en .de { display: none; } body.lang-en .en { display: block; }
+  span.de { display: inline; } span.en { display: none; }
+  body.lang-en span.de { display: none; } body.lang-en span.en { display: inline; }
+
+  .reveal { opacity: 0; transform: translateY(30px); transition: opacity 0.6s ease, transform 0.6s ease; }
+  .reveal.visible { opacity: 1; transform: translateY(0); }
+
+  @media (max-width: 768px) {
+    nav { padding: 1rem 1.5rem; } .nav-links { display: none; }
+    section { padding: 4rem 1.5rem; } .hero { padding: 6rem 1.5rem 3rem; }
+    .stats-bar { padding: 2rem 1.5rem; gap: 2rem; }
+    .guide-grid { grid-template-columns: 1fr; }
+    footer { flex-direction: column; text-align: center; padding: 2rem 1.5rem; }
+    .disclaimer-box { flex-direction: column; gap: 1rem; }
+  }
+
+  /* ── SHOP / DOWNLOAD ── */
+  .shop-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(300px, 1fr)); gap: 2rem; margin-top: 3rem; }
+  .shop-card { background: var(--bg2); border: 1px solid var(--border2); border-radius: 16px; padding: 2rem; position: relative; overflow: hidden; transition: all 0.3s; }
+  .shop-card:hover { transform: translateY(-4px); box-shadow: var(--glow); }
+  .shop-card.featured { border-color: rgba(245,166,35,0.5); }
+  .shop-card.featured::before { content: ''; position: absolute; top: 0; left: 0; right: 0; height: 3px; background: linear-gradient(90deg, var(--solar), var(--solar2)); }
+  .shop-badge { display: inline-block; background: var(--solar); color: #000; font-size: 0.7rem; font-weight: 700; padding: 0.25rem 0.75rem; border-radius: 20px; font-family: 'DM Mono', monospace; margin-bottom: 1rem; text-transform: uppercase; letter-spacing: 0.05em; }
+  .shop-badge.free { background: var(--green); }
+  .shop-title { font-family: 'Syne', sans-serif; font-size: 1.4rem; font-weight: 800; margin-bottom: 0.5rem; }
+  .shop-price { font-family: 'Syne', sans-serif; font-size: 2.5rem; font-weight: 800; color: var(--solar); margin: 1rem 0; line-height: 1; }
+  .shop-price span { font-size: 1rem; color: var(--text2); font-weight: 400; font-family: 'Inter', sans-serif; }
+  .shop-features { list-style: none; margin: 1.5rem 0; }
+  .shop-features li { font-size: 0.875rem; color: var(--text2); padding: 0.4rem 0; display: flex; align-items: center; gap: 0.75rem; border-bottom: 1px solid var(--border2); }
+  .shop-features li:last-child { border-bottom: none; }
+  .shop-features li::before { content: '✓'; color: var(--green); font-weight: 700; flex-shrink: 0; }
+  .shop-features li.missing { color: var(--text3); }
+  .shop-features li.missing::before { content: '—'; color: var(--text3); }
+  .shop-btn { display: block; width: 100%; padding: 1rem; border-radius: 8px; font-family: 'Syne', sans-serif; font-weight: 700; font-size: 0.95rem; text-align: center; text-decoration: none; cursor: pointer; border: none; transition: all 0.2s; margin-top: 1.5rem; }
+  .shop-btn.primary { background: linear-gradient(135deg, var(--solar), var(--solar2)); color: #000; }
+  .shop-btn.primary:hover { transform: translateY(-2px); box-shadow: 0 8px 30px rgba(245,166,35,0.4); }
+  .shop-btn.secondary { background: transparent; color: var(--text); border: 1px solid var(--border2); }
+  .shop-btn.secondary:hover { border-color: var(--solar); color: var(--solar); }
+  .shop-note { font-size: 0.75rem; color: var(--text3); margin-top: 0.75rem; text-align: center; font-family: 'DM Mono', monospace; }
+</style>
+</head>
+<body>
+
+<nav>
+  <a href="#" class="logo">Passive<span>Compute</span>.de</a>
+  <ul class="nav-links">
+    <li><a href="#transparency"><span class="de">Transparenz</span><span class="en">Transparency</span></a></li>
+    <li><a href="#market"><span class="de">Markt</span><span class="en">Market</span></a></li>
+    <li><a href="#tools"><span class="de">Tools</span><span class="en">Tools</span></a></li>
+    <li><a href="#earnings"><span class="de">Einnahmen</span><span class="en">Earnings</span></a></li>
+    <li><a href="#guide">Guide</a></li>
+    <li><a href="#faq">FAQ</a></li>
+    <li><a href="#download"><span class="de">Download</span><span class="en">Download</span></a></li>
+  </ul>
+  <div class="lang-toggle">
+    <button class="lang-btn active" onclick="setLang('de')">DE</button>
+    <button class="lang-btn" onclick="setLang('en')">EN</button>
+  </div>
+</nav>
+
+<!-- HERO -->
+<div class="hero">
+  <div class="hero-bg"></div>
+  <div class="hero-grid"></div>
+  <div class="hero-content">
+    <div class="hero-badge">
+      <span class="de">☀️ Solar-betrieben · 0€ Stromkosten · 24/7 online · Made in Germany</span>
+      <span class="en">☀️ Solar-powered · 0€ electricity · 24/7 online · Made in Germany</span>
+    </div>
+    <h1>
+      <span class="de">Passives Einkommen<br>mit deiner <em>GPU</em></span>
+      <span class="en">Passive Income<br>with your <em>GPU</em></span>
+    </h1>
+    <p class="hero-sub">
+      <span class="de">Lass deine Hardware für dich arbeiten. GPU-Rental, Bandwidth-Sharing und DePIN-Netzwerke zahlen rund um die Uhr — vollautomatisch, solar-betrieben und ohne aktiven Aufwand. Der globale GPU-Rental-Markt wächst von 9,2 Milliarden USD (2025) auf geschätzte 33,9 Milliarden USD bis 2032.</span>
+      <span class="en">Let your hardware work for you. GPU rental, bandwidth sharing and DePIN networks pay around the clock — fully automated, solar-powered and without active effort. The global GPU rental market grows from $9.2 billion (2025) to an estimated $33.9 billion by 2032.</span>
+    </p>
+    <div class="hero-cta">
+      <a href="#tools" class="btn-primary">
+        <span class="de">🚀 Jetzt starten</span>
+        <span class="en">🚀 Get Started</span>
+      </a>
+      <a href="#transparency" class="btn-secondary">
+        <span class="de">🤝 Transparenz</span>
+        <span class="en">🤝 Transparency</span>
+      </a>
+    </div>
+  </div>
+</div>
+
+<!-- STATS -->
+<div class="stats-bar">
+  <div class="stat">
+    <span class="stat-value">€0</span>
+    <span class="stat-label de">Stromkosten / kWh</span>
+    <span class="stat-label en">Electricity cost / kWh</span>
+  </div>
+  <div class="stat">
+    <span class="stat-value">$9.2B</span>
+    <span class="stat-label de">GPU-Markt 2025</span>
+    <span class="stat-label en">GPU market 2025</span>
+  </div>
+  <div class="stat">
+    <span class="stat-value">270%</span>
+    <span class="stat-label de">DePIN Wachstum 2025</span>
+    <span class="stat-label en">DePIN growth 2025</span>
+  </div>
+  <div class="stat">
+    <span class="stat-value">41.8M</span>
+    <span class="stat-label de">DePIN-Geräte weltweit</span>
+    <span class="stat-label en">DePIN devices worldwide</span>
+  </div>
+  <div class="stat">
+    <span class="stat-value">8+</span>
+    <span class="stat-label de">Einkommensquellen</span>
+    <span class="stat-label en">Income streams</span>
+  </div>
+</div>
+
+<!-- TRANSPARENCY / DISCLAIMER -->
+<section id="transparency">
+  <span class="section-label de">Transparenz & Offenheit</span>
+  <span class="section-label en">Transparency & Openness</span>
+  <h2 class="section-title">
+    <span class="de">Offene Karten:<br>Wie diese Seite funktioniert</span>
+    <span class="en">Full transparency:<br>How this site works</span>
+  </h2>
+  <p class="section-sub">
+    <span class="de">Wir glauben an Ehrlichkeit. Deshalb erklären wir klar und deutlich, wie PassiveCompute.de funktioniert — und womit wir Geld verdienen.</span>
+    <span class="en">We believe in honesty. That's why we explain clearly how PassiveCompute.de works — and how we make money.</span>
+  </p>
+
+  <div class="disclaimer-box reveal">
+    <div class="disclaimer-icon">🔗</div>
+    <div>
+      <div class="disclaimer-title de">Ja, wir nutzen Referral-Links — und das sagen wir dir offen</div>
+      <div class="disclaimer-title en">Yes, we use referral links — and we tell you openly</div>
+      <p class="disclaimer-text de">
+        Viele der Links auf dieser Seite sind Referral-Links. Das bedeutet: wenn du dich über einen unserer Links registrierst, erhalten wir eine kleine Provision oder einen Bonus — <strong>ohne dass dir dadurch Kosten entstehen</strong>. Im Gegenteil: bei den meisten Plattformen erhältst du durch unseren Referral-Link sogar selbst einen Startbonus.<br><br>
+        Wir empfehlen ausschließlich Dienste, die wir <strong>selbst aktiv nutzen</strong> und von deren Funktionalität wir überzeugt sind. Keine versteckten Kosten, keine bezahlten Platzierungen, keine falschen Versprechen. Die Einnahmen aus Referrals helfen uns, diese Seite zu betreiben und weiterzuentwickeln.<br><br>
+        <strong>Alle Einnahmeprognosen auf dieser Seite sind konservative Schätzungen</strong> — keine Garantien. Tatsächliche Einnahmen variieren je nach Hardware, Standort, Auslastung und Marktbedingungen.
+      </p>
+      <p class="disclaimer-text en">
+        Many of the links on this site are referral links. This means: when you register through one of our links, we receive a small commission or bonus — <strong>without any cost to you</strong>. On the contrary: with most platforms you even receive a sign-up bonus yourself through our referral link.<br><br>
+        We only recommend services that we <strong>actively use ourselves</strong> and are convinced of their functionality. No hidden costs, no paid placements, no false promises. Referral income helps us operate and develop this site.<br><br>
+        <strong>All income projections on this site are conservative estimates</strong> — not guarantees. Actual earnings vary depending on hardware, location, utilization and market conditions.
+      </p>
+    </div>
+  </div>
+
+  <div class="disclaimer-box reveal" style="margin-top: 1rem; border-color: rgba(6,214,160,0.25); border-left-color: var(--green); background: rgba(6,214,160,0.04);">
+    <div class="disclaimer-icon">☀️</div>
+    <div>
+      <div class="disclaimer-title" style="color: var(--green);" class="de">Unser Setup — für volle Transparenz</div>
+      <div class="disclaimer-title" style="color: var(--green);" class="en">Our setup — for full transparency</div>
+      <p class="disclaimer-text de">
+        PassiveCompute.de betreiben wir auf einem selbst aufgebauten System: einem GPU-Node mit einer leistungsstarken NVIDIA-Grafikkarte (12+ GB VRAM) unter Ubuntu 24.04 LTS, vollständig mit Solarstrom betrieben. Hinzu kommt ein Raspberry Pi 4 für Bandwidth-Sharing-Apps. Alles läuft 24/7 automatisch — ohne täglichen Eingriff. Was wir hier beschreiben, leben wir selbst.
+      </p>
+      <p class="disclaimer-text en">
+        We run PassiveCompute.de on a self-built system: a GPU node with a powerful NVIDIA graphics card (12+ GB VRAM) running Ubuntu 24.04 LTS, fully powered by solar energy. Additionally a Raspberry Pi 4 for bandwidth sharing apps. Everything runs 24/7 automatically — without daily intervention. What we describe here, we live ourselves.
+      </p>
+    </div>
+  </div>
+</section>
+
+<!-- MARKET -->
+<section id="market" style="padding-top: 2rem;">
+  <span class="section-label de">Marktdaten 2025/2026</span>
+  <span class="section-label en">Market data 2025/2026</span>
+  <h2 class="section-title">
+    <span class="de">Warum jetzt der<br>richtige Zeitpunkt ist</span>
+    <span class="en">Why now is<br>the right time</span>
+  </h2>
+  <p class="section-sub">
+    <span class="de">Der Markt für dezentrales GPU-Computing und DePIN wächst explosionsartig. KI-Nachfrage übersteigt das Angebot — und private GPU-Betreiber profitieren davon direkt.</span>
+    <span class="en">The market for decentralized GPU computing and DePIN is growing explosively. AI demand exceeds supply — and private GPU operators benefit directly from this.</span>
+  </p>
+  <div class="market-grid reveal">
+    <div class="market-card">
+      <span class="market-num">$9.2B</span>
+      <div class="market-desc de">GPU-Rental-Markt 2025</div>
+      <div class="market-desc en">GPU rental market 2025</div>
+      <div class="market-source">Quelle: 360iResearch</div>
+    </div>
+    <div class="market-card">
+      <span class="market-num">+29%</span>
+      <div class="market-desc de">Marktwachstum 2026</div>
+      <div class="market-desc en">Market growth 2026</div>
+      <div class="market-source">Quelle: Spheron Network</div>
+    </div>
+    <div class="market-card">
+      <span class="market-num">$19B</span>
+      <div class="market-desc de">DePIN Marktkapitalisierung Sept. 2025</div>
+      <div class="market-desc en">DePIN market cap Sept. 2025</div>
+      <div class="market-source">Quelle: CoinGecko</div>
+    </div>
+    <div class="market-card">
+      <span class="market-num">270%</span>
+      <div class="market-desc de">DePIN Wachstum in 12 Monaten</div>
+      <div class="market-desc en">DePIN growth in 12 months</div>
+      <div class="market-source">Quelle: CoinGecko Sept. 2025</div>
+    </div>
+    <div class="market-card">
+      <span class="market-num">41.8M</span>
+      <div class="market-desc de">DePIN-Geräte weltweit (2025)</div>
+      <div class="market-desc en">DePIN devices worldwide (2025)</div>
+      <div class="market-source">Quelle: DePINscan</div>
+    </div>
+    <div class="market-card">
+      <span class="market-num">1.5–4×</span>
+      <div class="market-desc de">KI-Rental vs. Mining (Ertrag/h)</div>
+      <div class="market-desc en">AI rental vs. mining (earnings/h)</div>
+      <div class="market-source">Quelle: ShareAI Blog 2026</div>
+    </div>
+  </div>
+  <p style="margin-top: 1.5rem; font-size: 0.85rem; color: var(--text2); line-height: 1.7;" class="de">
+    Der Schlüsselfaktor: <strong style="color: var(--solar);">Nachfrage übersteigt das Angebot.</strong> NVIDIA kann Chips nicht schnell genug produzieren — Engpässe werden laut Analysten mindestens bis 2026-2027 anhalten. Für private GPU-Betreiber bedeutet das: stabile bis steigende Preise für Rechenleistung. Wer jetzt einsteigt, profitiert von einem Markt der noch am Anfang seiner Wachstumsphase steht.
+  </p>
+  <p style="margin-top: 1.5rem; font-size: 0.85rem; color: var(--text2); line-height: 1.7;" class="en">
+    The key factor: <strong style="color: var(--solar);">Demand exceeds supply.</strong> NVIDIA cannot produce chips fast enough — shortages will persist according to analysts until at least 2026-2027. For private GPU operators this means: stable to rising prices for computing power. Those who enter now benefit from a market that is still at the beginning of its growth phase.
+  </p>
+</section>
+
+<!-- HOW IT WORKS -->
+<section id="how" style="padding-top: 2rem;">
+  <span class="section-label de">So funktioniert es</span>
+  <span class="section-label en">How it works</span>
+  <h2 class="section-title">
+    <span class="de">Einmal einrichten,<br>dauerhaft verdienen</span>
+    <span class="en">Set up once,<br>earn permanently</span>
+  </h2>
+  <p class="section-sub">
+    <span class="de">Das Konzept ist einfach: deine Hardware läuft ohnehin — lass sie dabei Geld verdienen. Mit Solarstrom werden die Einnahmen zu nahezu reinem Gewinn, da die größte Kostenstelle (Strom) wegfällt. Bei deutschen Strompreisen von ca. 0,30€/kWh kostet eine GPU im 24/7-Betrieb schnell €50–80 pro Monat — mit Solar ist das null.</span>
+    <span class="en">The concept is simple: your hardware runs anyway — let it earn money. With solar power, income becomes almost pure profit, since the biggest cost factor (electricity) disappears. At German electricity prices of about €0.30/kWh, a GPU running 24/7 quickly costs €50–80 per month — with solar that's zero.</span>
+  </p>
+  <div class="steps reveal">
+    <div class="step">
+      <div class="step-num">01</div>
+      <h3 class="de">Registrieren</h3>
+      <h3 class="en">Register</h3>
+      <p class="de">Erstelle einen Account über unsere Referral-Links. Du erhältst einen Startbonus, wir eine kleine Provision. Transparent und fair für alle Seiten.</p>
+      <p class="en">Create an account via our referral links. You get a signup bonus, we get a small commission. Transparent and fair for all parties.</p>
+    </div>
+    <div class="step">
+      <div class="step-num">02</div>
+      <h3 class="de">Installieren</h3>
+      <h3 class="en">Install</h3>
+      <p class="de">Die meisten Apps laufen als Docker-Container — ein Befehl, fertig. Unser Setup-Guide führt dich durch jeden Schritt. Kein tiefes technisches Wissen nötig.</p>
+      <p class="en">Most apps run as Docker containers — one command, done. Our setup guide walks you through every step. No deep technical knowledge required.</p>
+    </div>
+    <div class="step">
+      <div class="step-num">03</div>
+      <h3 class="de">Verdienen</h3>
+      <h3 class="en">Earn</h3>
+      <p class="de">Dein System verdient vollautomatisch — GPU-Rental, Bandwidth-Sharing, DePIN-Rewards. Alles parallel, alles passiv, alles 24/7. Kein täglicher Eingriff notwendig.</p>
+      <p class="en">Your system earns fully automatically — GPU rental, bandwidth sharing, DePIN rewards. All parallel, all passive, all 24/7. No daily intervention required.</p>
+    </div>
+    <div class="step">
+      <div class="step-num">04</div>
+      <h3 class="de">Auszahlen</h3>
+      <h3 class="en">Cash out</h3>
+      <p class="de">Auszahlung via USDC, PayPal oder direkt in EUR. Token-Earnings empfehlen wir zeitnah via Binance → Kraken in Euro zu tauschen, um Kursrisiken zu minimieren.</p>
+      <p class="en">Payout via USDC, PayPal or directly in EUR. We recommend converting token earnings promptly via Binance → Kraken to minimize exchange rate risks.</p>
+    </div>
+  </div>
+</section>
+
+<!-- TOOLS & REFERRALS -->
+<section id="tools" style="padding-top: 2rem;">
+  <span class="section-label de">Tools & Referrals</span>
+  <span class="section-label en">Tools & Referrals</span>
+  <h2 class="section-title">
+    <span class="de">Die besten Apps<br>für passives Einkommen</span>
+    <span class="en">The best apps<br>for passive income</span>
+  </h2>
+  <p class="section-sub">
+    <span class="de">Alle Apps die wir selbst aktiv nutzen — mit Referral-Bonus für dich. <strong>Hinweis: markierte Links sind Referral-Links</strong> — du zahlst nichts extra, erhältst aber oft einen Startbonus. Nicht markierte Links sind direkte Hersteller-Links ohne Provision.</span>
+    <span class="en">All apps we actively use ourselves — with referral bonus for you. <strong>Note: marked links are referral links</strong> — you pay nothing extra, but often receive a signup bonus. Unmarked links are direct manufacturer links without commission.</span>
+  </p>
+
+  <div class="tools-grid reveal">
+
+    <!-- Honeygain -->
+    <div class="tool-card featured">
+      <div class="tool-header">
+        <div class="tool-icon">🍯</div>
+        <span class="tool-badge bandwidth">Bandwidth</span>
+      </div>
+      <div>
+        <div class="tool-name">Honeygain</div>
+        <p class="tool-desc de">Teile deine ungenutzte Internetbandbreite mit Unternehmen für Marktforschung und Datenaggregation. Seit 2019 aktiv, über 10 Millionen Nutzer weltweit. Läuft auf Windows, macOS, Linux, Android und als Docker-Container. Auszahlung via PayPal oder JMPT-Token.</p>
+        <p class="tool-desc en">Share your unused internet bandwidth with companies for market research and data aggregation. Active since 2019, over 10 million users worldwide. Runs on Windows, macOS, Linux, Android and as Docker container. Payout via PayPal or JMPT token.</p>
+      </div>
+      <div class="tool-earnings">
+        <span class="earnings-label de">Monatlich pro Gerät</span>
+        <span class="earnings-label en">Monthly per device</span>
+        <span class="earnings-value">€3–8</span>
+      </div>
+      <div>
+        <a href="https://r.honeygain.me/DEIN-CODE" class="referral-link" target="_blank">
+          🔗 <span class="de">Jetzt starten + $5 Bonus</span><span class="en">Start now + $5 Bonus</span>
+        </a>
+        <div class="referral-bonus de">✨ $5 Startguthaben für dich</div>
+        <div class="referral-bonus en">✨ $5 starting credit for you</div>
+      </div>
+    </div>
+
+    <!-- EarnApp -->
+    <div class="tool-card featured">
+      <div class="tool-header">
+        <div class="tool-icon">💰</div>
+        <span class="tool-badge bandwidth">Bandwidth</span>
+      </div>
+      <div>
+        <div class="tool-name">EarnApp</div>
+        <p class="tool-desc de">Von Bright Data entwickelt — einem der führenden Datenanbieter weltweit mit über 20 Jahren Erfahrung. EarnApp nutzt deine Bandbreite für legitime Business-Intelligence-Workloads. Besonders zuverlässige Auszahlung via PayPal, mindestens $2.50 zum Auszahlen.</p>
+        <p class="tool-desc en">Developed by Bright Data — one of the world's leading data providers with over 20 years of experience. EarnApp uses your bandwidth for legitimate business intelligence workloads. Particularly reliable PayPal payout, minimum $2.50 to withdraw.</p>
+      </div>
+      <div class="tool-earnings">
+        <span class="earnings-label de">Monatlich pro Gerät</span>
+        <span class="earnings-label en">Monthly per device</span>
+        <span class="earnings-value">€2–6</span>
+      </div>
+      <div>
+        <a href="https://earnapp.com/i/DEIN-CODE" class="referral-link" target="_blank">
+          🔗 <span class="de">Jetzt starten</span><span class="en">Start now</span>
+        </a>
+        <div class="referral-bonus de">✨ Referral-Bonus für beide Seiten</div>
+        <div class="referral-bonus en">✨ Referral bonus for both sides</div>
+      </div>
+    </div>
+
+    <!-- Repocket -->
+    <div class="tool-card featured">
+      <div class="tool-header">
+        <div class="tool-icon">🔄</div>
+        <span class="tool-badge bandwidth">Bandwidth</span>
+      </div>
+      <div>
+        <div class="tool-name">Repocket</div>
+        <p class="tool-desc de">Bandwidth-Sharing mit wettbewerbsfähigen Auszahlungsraten und transparentem Dashboard. Läuft ideal als Docker-Container auf Raspberry Pi oder Server. Kombination mit anderen Bandwidth-Apps möglich — nutzt verschiedene Ports und Ressourcen.</p>
+        <p class="tool-desc en">Bandwidth sharing with competitive payout rates and transparent dashboard. Runs ideally as Docker container on Raspberry Pi or server. Combination with other bandwidth apps possible — uses different ports and resources.</p>
+      </div>
+      <div class="tool-earnings">
+        <span class="earnings-label de">Monatlich pro Gerät</span>
+        <span class="earnings-label en">Monthly per device</span>
+        <span class="earnings-value">€2–5</span>
+      </div>
+      <div>
+        <a href="https://link.repocket.com/DEIN-CODE" class="referral-link" target="_blank">
+          🔗 <span class="de">Jetzt starten</span><span class="en">Start now</span>
+        </a>
+        <div class="referral-bonus de">✨ 50% der Ersteinnahmen für dich</div>
+        <div class="referral-bonus en">✨ 50% of first earnings for you</div>
+      </div>
+    </div>
+
+    <!-- Clore.ai -->
+    <div class="tool-card featured">
+      <div class="tool-header">
+        <div class="tool-icon">🖥️</div>
+        <span class="tool-badge gpu">GPU Rental</span>
+      </div>
+      <div>
+        <div class="tool-name">Clore.ai</div>
+        <p class="tool-desc de">GPU-Rental Marktplatz speziell für KI- und ML-Workloads. Mieter zahlen pro Stunde für Zugriff auf deine GPU — du bestimmst den Preis. Weniger bandbreitenabhängig als Vast.ai, daher auch mit standard DSL-Verbindungen gut nutzbar. Empfohlen: GPU mit mindestens 12 GB VRAM.</p>
+        <p class="tool-desc en">GPU rental marketplace specifically for AI and ML workloads. Renters pay per hour for access to your GPU — you set the price. Less bandwidth-dependent than Vast.ai, therefore also usable with standard DSL connections. Recommended: GPU with at least 12 GB VRAM.</p>
+      </div>
+      <div class="tool-earnings">
+        <span class="earnings-label de">Monatlich (12+ GB VRAM GPU)</span>
+        <span class="earnings-label en">Monthly (12+ GB VRAM GPU)</span>
+        <span class="earnings-value">€30–80</span>
+      </div>
+      <div>
+        <a href="https://clore.ai/?ref=DEIN-CODE" class="referral-link" target="_blank">
+          🔗 <span class="de">Als Host registrieren</span><span class="en">Register as host</span>
+        </a>
+        <div class="referral-bonus de">✨ Provision auf Einnahmen deiner Referrals</div>
+        <div class="referral-bonus en">✨ Commission on your referrals' earnings · Commission for us</div>
+      </div>
+    </div>
+
+    <!-- Akash -->
+    <div class="tool-card">
+      <div class="tool-header">
+        <div class="tool-icon">⛓️</div>
+        <span class="tool-badge depin">DePIN</span>
+      </div>
+      <div>
+        <div class="tool-name">Akash Network</div>
+        <p class="tool-desc de">Dezentrale Cloud-Infrastruktur auf Cosmos-Blockchain — der "dezentrale AWS-Killer". Marktkapitalisierung von ca. 330 Millionen USD (Sept. 2025). Als Provider verdienst du AKT-Token ohne hohe Plattformgebühren (nur ~2% Gas). 70%+ Netzwerkauslastung in Spitzenzeiten. Setup erfordert Kubernetes-Kenntnisse.</p>
+        <p class="tool-desc en">Decentralized cloud infrastructure on Cosmos blockchain — the "decentralized AWS killer". Market cap of approximately $330 million (Sept. 2025). As a provider you earn AKT tokens without high platform fees (only ~2% gas). 70%+ network utilization at peak times. Setup requires Kubernetes knowledge.</p>
+      </div>
+      <div class="tool-earnings">
+        <span class="earnings-label de">Monatlich konservativ</span>
+        <span class="earnings-label en">Monthly conservative</span>
+        <span class="earnings-value">€40–100</span>
+      </div>
+      <div>
+        <a href="https://akash.network" class="referral-link" style="background: linear-gradient(135deg,#6366f1,#8b5cf6);" target="_blank">
+          ↗ <span class="de">Provider werden</span><span class="en">Become a provider</span>
+        </a>
+        <div class="referral-bonus" style="color: #a78bfa;" class="de">Setup-Guide folgt in Kürze</div>
+        <div class="referral-bonus" style="color: #a78bfa;" class="en">Setup guide coming soon</div>
+      </div>
+    </div>
+
+    <!-- Render -->
+    <div class="tool-card">
+      <div class="tool-header">
+        <div class="tool-icon">🎬</div>
+        <span class="tool-badge gpu">Rendering</span>
+      </div>
+      <div>
+        <div class="tool-name">Render Network</div>
+        <p class="tool-desc de">Dezentrales 3D-Rendering und KI-Compute auf Solana. Studios, Filmproduktionen und Creator kaufen Rechenleistung für komplexe Szenen. Saisonale Peaks: Q4 (Werbung), Sommer (Filmpostproduktion). Neuere Grafikkarten mit mehr VRAM erhalten bevorzugt Jobs und erledigen sie schneller — damit steigen Reputation und Einnahmen.</p>
+        <p class="tool-desc en">Decentralized 3D rendering and AI compute on Solana. Studios, film productions and creators buy computing power for complex scenes. Seasonal peaks: Q4 (advertising), summer (film post-production). Newer graphics cards with more VRAM preferentially receive jobs and complete them faster — reputation and earnings grow accordingly.</p>
+      </div>
+      <div class="tool-earnings">
+        <span class="earnings-label de">Monatlich konservativ</span>
+        <span class="earnings-label en">Monthly conservative</span>
+        <span class="earnings-value">€30–80</span>
+      </div>
+      <div>
+        <a href="https://rendernetwork.com" class="referral-link" style="background: linear-gradient(135deg,#f59e0b,#d97706);" target="_blank">
+          ↗ <span class="de">Auf Waitlist eintragen</span><span class="en">Join waitlist</span>
+        </a>
+        <div class="referral-bonus" style="color: #fcd34d;" class="de">Waitlist — bald verfügbar</div>
+        <div class="referral-bonus" style="color: #fcd34d;" class="en">Waitlist — available soon</div>
+      </div>
+    </div>
+
+    <!-- io.net -->
+    <div class="tool-card">
+      <div class="tool-header">
+        <div class="tool-icon">🌐</div>
+        <span class="tool-badge depin">DePIN</span>
+      </div>
+      <div>
+        <div class="tool-name">io.net</div>
+        <p class="tool-desc de">Dezentrales GPU-Netzwerk für AI-Inference und ML-Training. Über 327.000 verifizierte GPUs im Netzwerk (März 2025). Monatlicher Netzwerkumsatz von über 1 Million USD zeigt echte Nachfrage. Besonderheit: Co-Staking — IO-Token-Holder können gemeinsam mit GPU-Betreibern verdienen. Docker-basiertes Setup ohne Kubernetes.</p>
+        <p class="tool-desc en">Decentralized GPU network for AI inference and ML training. Over 327,000 verified GPUs in the network (March 2025). Monthly network revenue of over $1 million shows real demand. Special feature: co-staking — IO token holders can earn together with GPU operators. Docker-based setup without Kubernetes.</p>
+      </div>
+      <div class="tool-earnings">
+        <span class="earnings-label de">Monatlich konservativ</span>
+        <span class="earnings-label en">Monthly conservative</span>
+        <span class="earnings-value">€20–50</span>
+      </div>
+      <div>
+        <a href="https://io.net" class="referral-link" style="background: linear-gradient(135deg,#06b6d4,#0891b2);" target="_blank">
+          ↗ <span class="de">Node einrichten</span><span class="en">Set up node</span>
+        </a>
+      </div>
+    </div>
+
+    <!-- Golem -->
+    <div class="tool-card">
+      <div class="tool-header">
+        <div class="tool-icon">⚡</div>
+        <span class="tool-badge depin">DePIN</span>
+      </div>
+      <div>
+        <div class="tool-name">Golem Network</div>
+        <p class="tool-desc de">Seit 2016 aktiv — eines der ältesten dezentralen Computing-Netzwerke überhaupt. Keine Plattformgebühren, nur Ethereum Gas-Fees (~2%). Komplett permissionless: keine Bewerbung, keine Warteliste, sofort starten. GPU-Provider Beta seit 2024 aktiv. Jan. 2026 Partnerschaft mit Salad.com für AI-Inference-Workloads.</p>
+        <p class="tool-desc en">Active since 2016 — one of the oldest decentralized computing networks. No platform fees, only Ethereum gas fees (~2%). Completely permissionless: no application, no waitlist, start immediately. GPU provider beta active since 2024. Jan. 2026 partnership with Salad.com for AI inference workloads.</p>
+      </div>
+      <div class="tool-earnings">
+        <span class="earnings-label de">Monatlich konservativ</span>
+        <span class="earnings-label en">Monthly conservative</span>
+        <span class="earnings-value">€15–40</span>
+      </div>
+      <div>
+        <a href="https://www.golem.network" class="referral-link" style="background: linear-gradient(135deg,#10b981,#059669);" target="_blank">
+          ↗ <span class="de">Provider werden</span><span class="en">Become a provider</span>
+        </a>
+      </div>
+    </div>
+
+  </div>
+</section>
+
+<!-- EARNINGS -->
+<section id="earnings" style="padding-top: 2rem;">
+  <span class="section-label de">Einnahmen-Übersicht</span>
+  <span class="section-label en">Earnings Overview</span>
+  <h2 class="section-title">
+    <span class="de">Was ist realistisch<br>zu verdienen?</span>
+    <span class="en">What is realistic<br>to earn?</span>
+  </h2>
+  <p class="section-sub de">Konservative Schätzungen basierend auf eigenen Erfahrungen mit einem GPU-Node (12+ GB VRAM) + Raspberry Pi 4 Setup, betrieben mit Solarstrom. Die tatsächlichen Einnahmen hängen stark von Auslastung, Hardware und Marktbedingungen ab. Wir zeigen keine Fantasiezahlen — nur was wir selbst realistisch erreichen.</p>
+  <p class="section-sub en">Conservative estimates based on our own experience with a GPU node (12+ GB VRAM) + Raspberry Pi 4 setup, running on solar power. Actual earnings depend heavily on utilization, hardware and market conditions. We show no fantasy numbers — only what we realistically achieve ourselves.</p>
+
+  <div class="income-section reveal">
+    <div style="display: flex; align-items: center; gap: 1rem; flex-wrap: wrap; margin-bottom: 0.5rem;">
+      <h3 style="font-family: 'Syne', sans-serif; font-size: 1.2rem; font-weight: 700;" class="de">Monatliche Einnahmen — Konservatives Szenario</h3>
+      <h3 style="font-family: 'Syne', sans-serif; font-size: 1.2rem; font-weight: 700;" class="en">Monthly Earnings — Conservative Scenario</h3>
+      <div class="solar-tag">☀️ <span class="de">Solar: 0€ Strom</span><span class="en">Solar: 0€ electricity</span></div>
+    </div>
+    <table class="income-table">
+      <thead>
+        <tr>
+          <th><span class="de">Plattform</span><span class="en">Platform</span></th>
+          <th><span class="de">Typ</span><span class="en">Type</span></th>
+          <th><span class="de">Gerät</span><span class="en">Device</span></th>
+          <th><span class="de">€/Monat</span><span class="en">€/Month</span></th>
+        </tr>
+      </thead>
+      <tbody>
+        <tr><td class="platform">Clore.ai</td><td><span class="type-badge">GPU Rental</span></td><td style="color: var(--text2); font-size: 0.85rem;"><span class="de">GPU-Node</span><span class="en">GPU Node</span></td><td class="amount">€30–60</td></tr>
+        <tr><td class="platform">Akash Network</td><td><span class="type-badge">DePIN</span></td><td style="color: var(--text2); font-size: 0.85rem;"><span class="de">GPU-Node</span><span class="en">GPU Node</span></td><td class="amount">€40–100</td></tr>
+        <tr><td class="platform">Render Network</td><td><span class="type-badge">Rendering</span></td><td style="color: var(--text2); font-size: 0.85rem;"><span class="de">GPU-Node</span><span class="en">GPU Node</span></td><td class="amount">€30–80</td></tr>
+        <tr><td class="platform">io.net / Golem</td><td><span class="type-badge">DePIN</span></td><td style="color: var(--text2); font-size: 0.85rem;"><span class="de">GPU-Node</span><span class="en">GPU Node</span></td><td class="amount">€20–50</td></tr>
+        <tr><td class="platform">Honeygain</td><td><span class="type-badge">Bandwidth</span></td><td style="color: var(--text2); font-size: 0.85rem;">Raspberry Pi</td><td class="amount">€3–8</td></tr>
+        <tr><td class="platform">EarnApp</td><td><span class="type-badge">Bandwidth</span></td><td style="color: var(--text2); font-size: 0.85rem;">Raspberry Pi</td><td class="amount">€2–6</td></tr>
+        <tr><td class="platform">Repocket</td><td><span class="type-badge">Bandwidth</span></td><td style="color: var(--text2); font-size: 0.85rem;">Raspberry Pi</td><td class="amount">€2–5</td></tr>
+        <tr class="total-row"><td><span class="de">GESAMT (konservativ)</span><span class="en">TOTAL (conservative)</span></td><td></td><td></td><td>€127–309</td></tr>
+      </tbody>
+    </table>
+    <p style="margin-top: 1.5rem; font-size: 0.8rem; color: var(--text3); font-family: 'DM Mono', monospace;" class="de">* Stromkosten: €0 (Solar). Steuer (25% Gewerbe) noch nicht abgezogen. Token-Kursschwankungen nicht berücksichtigt. Keine Garantie — Einnahmen variieren.</p>
+    <p style="margin-top: 1.5rem; font-size: 0.8rem; color: var(--text3); font-family: 'DM Mono', monospace;" class="en">* Electricity cost: €0 (Solar). Tax (25% business) not yet deducted. Token price fluctuations not accounted for. No guarantee — earnings vary.</p>
+  </div>
+</section>
+
+<!-- GUIDE -->
+<section id="guide" style="padding-top: 2rem;">
+  <span class="section-label de">Setup-Guide</span>
+  <span class="section-label en">Setup Guide</span>
+  <h2 class="section-title">
+    <span class="de">Schnellstart:<br>In 4 Schritten live</span>
+    <span class="en">Quick start:<br>Live in 4 steps</span>
+  </h2>
+  <div class="guide-grid reveal">
+    <div class="guide-card">
+      <h3>🖥️ <span class="de">GPU-Node Setup</span><span class="en">GPU Node Setup</span></h3>
+      <ul class="guide-steps">
+        <li data-n="1"><span class="de">Ubuntu 24.04 Server LTS installieren (kein Desktop nötig)</span><span class="en">Install Ubuntu 24.04 Server LTS (no desktop needed)</span></li>
+        <li data-n="2"><span class="de">NVIDIA Treiber 570.x + CUDA 12.8 installieren</span><span class="en">Install NVIDIA driver 570.x + CUDA 12.8</span></li>
+        <li data-n="3"><span class="de">Docker Engine + NVIDIA Container Toolkit</span><span class="en">Docker Engine + NVIDIA Container Toolkit</span></li>
+        <li data-n="4"><span class="de">Clore.ai Account erstellen + clore-hosting installieren</span><span class="en">Create Clore.ai account + install clore-hosting</span></li>
+        <li data-n="5"><span class="de">Prometheus + Grafana für Monitoring und Troubleshooting</span><span class="en">Prometheus + Grafana for monitoring and troubleshooting</span></li>
+      </ul>
+    </div>
+    <div class="guide-card">
+      <h3>🍓 <span class="de">Raspberry Pi Setup</span><span class="en">Raspberry Pi Setup</span></h3>
+      <ul class="guide-steps">
+        <li data-n="1"><span class="de">Raspberry Pi 4 (4GB RAM empfohlen) + Raspberry Pi OS Lite 64-bit</span><span class="en">Raspberry Pi 4 (4GB RAM recommended) + Raspberry Pi OS Lite 64-bit</span></li>
+        <li data-n="2"><span class="de">Docker Engine für ARM64 installieren</span><span class="en">Install Docker Engine for ARM64</span></li>
+        <li data-n="3"><span class="de">Honeygain, EarnApp, Repocket als Docker-Container starten</span><span class="en">Start Honeygain, EarnApp, Repocket as Docker containers</span></li>
+        <li data-n="4"><span class="de">Watchtower für automatische Container-Updates aktivieren</span><span class="en">Enable Watchtower for automatic container updates</span></li>
+        <li data-n="5"><span class="de">24/7 am Laufen lassen — fertig! Kein weiterer Aufwand.</span><span class="en">Keep running 24/7 — done! No further effort needed.</span></li>
+      </ul>
+    </div>
+    <div class="guide-card">
+      <h3>☀️ <span class="de">Solar-Setup (optional, aber empfohlen)</span><span class="en">Solar setup (optional, but recommended)</span></h3>
+      <ul class="guide-steps">
+        <li data-n="1"><span class="de">All-in-One Speichersystem mit 4 MPPT-Eingängen wählen</span><span class="en">Choose all-in-one storage system with 4 MPPT inputs</span></li>
+        <li data-n="2"><span class="de">4× 500W Bifazial-TOPCon-Module für optimalen Jahresertrag</span><span class="en">4× 500W bifacial TOPCon modules for optimal annual yield</span></li>
+        <li data-n="3"><span class="de">Inselbetrieb konfigurieren — keine Netzeinspeisung nötig</span><span class="en">Configure island mode — no grid feed-in needed</span></li>
+        <li data-n="4"><span class="de">UPS-Funktion schützt Node bei Sonnenmangel / Nacht</span><span class="en">UPS function protects node during low sun / night</span></li>
+        <li data-n="5"><span class="de">MaStR-Registrierung in Deutschland (gesetzlich Pflicht)</span><span class="en">MaStR registration in Germany (legally required)</span></li>
+      </ul>
+    </div>
+    <div class="guide-card">
+      <h3>💸 <span class="de">Auszahlung & Steuern</span><span class="en">Payout & Taxes</span></h3>
+      <ul class="guide-steps">
+        <li data-n="1"><span class="de">Binance-Account für Token-Konvertierung in USDT</span><span class="en">Binance account for token conversion to USDT</span></li>
+        <li data-n="2"><span class="de">Kraken für USDT→EUR + SEPA-Auszahlung auf Girokonto</span><span class="en">Kraken for USDT→EUR + SEPA withdrawal to bank account</span></li>
+        <li data-n="3"><span class="de">Gewerbe anmelden: als Kleinunternehmer (§19 UStG) bis €22.000 keine USt.</span><span class="en">Register business: as small business (§19 UStG) no VAT up to €22,000</span></li>
+        <li data-n="4"><span class="de">Alle Einnahmen dokumentieren — Datum, Betrag, Plattform</span><span class="en">Document all income — date, amount, platform</span></li>
+        <li data-n="5"><span class="de">Hardware als Betriebsausgabe abschreiben (AfA, 3 Jahre)</span><span class="en">Depreciate hardware as business expense (3 years)</span></li>
+      </ul>
+    </div>
+  </div>
+</section>
+
+<!-- FAQ -->
+<section id="faq" style="padding-top: 2rem;">
+  <span class="section-label">FAQ</span>
+  <h2 class="section-title">
+    <span class="de">Häufige Fragen</span>
+    <span class="en">Frequently Asked Questions</span>
+  </h2>
+  <div class="faq-list reveal">
+    <div class="faq-item">
+      <div class="faq-question" onclick="toggleFaq(this)">
+        <span class="de">Verdient ihr Geld mit den Referral-Links?</span>
+        <span class="en">Do you earn money with the referral links?</span>
+        <span class="faq-arrow">+</span>
+      </div>
+      <div class="faq-answer">
+        <p class="de">Ja — und das sagen wir offen. Wenn du dich über unsere Links registrierst, erhalten wir eine Provision oder einen Bonus. Dir entstehen dadurch keine Mehrkosten — bei vielen Plattformen erhältst du sogar selbst einen Startbonus. Wir empfehlen nur Dienste, die wir selbst nutzen. Diese Transparenz ist uns wichtig.</p>
+        <p class="en">Yes — and we say so openly. When you register via our links, we receive a commission or bonus. This doesn't cost you anything extra — with many platforms you even receive a signup bonus yourself. We only recommend services we use ourselves. This transparency is important to us.</p>
+      </div>
+    </div>
+    <div class="faq-item">
+      <div class="faq-question" onclick="toggleFaq(this)">
+        <span class="de">Welche Hardware brauche ich mindestens?</span>
+        <span class="en">What hardware do I need at minimum?</span>
+        <span class="faq-arrow">+</span>
+      </div>
+      <div class="faq-answer">
+        <p class="de">Für reines Bandwidth-Sharing reicht ein Raspberry Pi 4 (ca. €60–80). Für GPU-Rental brauchst du eine NVIDIA-Grafikkarte — empfohlen mind. 12 GB VRAM für KI-Workloads (RTX 3080 12GB, RTX 4070 Ti, RTX 4080 oder aktueller). Mehr VRAM bedeutet mehr Jobs, bessere Einnahmen. AMD-GPUs werden von den meisten KI-Plattformen noch nicht unterstützt.</p>
+        <p class="en">For pure bandwidth sharing, a Raspberry Pi 4 (~€60–80) is sufficient. For GPU rental you need an NVIDIA graphics card — recommended at least 12 GB VRAM for AI workloads (RTX 3080 12GB, RTX 4070 Ti, RTX 4080 or newer). More VRAM means more jobs, better earnings. AMD GPUs are not yet supported by most AI platforms.</p>
+      </div>
+    </div>
+    <div class="faq-item">
+      <div class="faq-question" onclick="toggleFaq(this)">
+        <span class="de">Ist Solar wirklich notwendig?</span>
+        <span class="en">Is solar really necessary?</span>
+        <span class="faq-arrow">+</span>
+      </div>
+      <div class="faq-answer">
+        <p class="de">Nein, aber sehr empfehlenswert. Bei deutschen Strompreisen (~0,30€/kWh) kostet eine GPU mit 200W im 24/7-Betrieb ca. €43/Monat. Mit Solar sind diese Kosten null. Ohne Solar lohnt sich das GPU-Rental-Setup erst richtig ab ca. RTX 4080 aufwärts — mit Solar ist auch eine kleinere GPU profitabel. Für Bandwidth-Sharing auf dem Raspberry Pi macht Solar weniger Unterschied (Pi verbraucht nur ~3–5W).</p>
+        <p class="en">No, but highly recommended. At German electricity prices (~€0.30/kWh), a GPU with 200W running 24/7 costs about €43/month. With solar these costs are zero. Without solar, GPU rental only really pays off from about RTX 4080 upward — with solar even a smaller GPU is profitable. For bandwidth sharing on the Raspberry Pi, solar makes less difference (Pi only consumes ~3–5W).</p>
+      </div>
+    </div>
+    <div class="faq-item">
+      <div class="faq-question" onclick="toggleFaq(this)">
+        <span class="de">Wie viel Bandbreite brauche ich?</span>
+        <span class="en">How much bandwidth do I need?</span>
+        <span class="faq-arrow">+</span>
+      </div>
+      <div class="faq-answer">
+        <p class="de">Für Bandwidth-Sharing reicht normales DSL mit 10+ Mbit/s Upload. Für GPU-Rental auf Clore.ai ist asymmetrisches DSL (z.B. 40 Mbit/s Upload) ausreichend. Für Akash Network und Render Network ist mehr Upload besser — 100+ Mbit/s empfohlen. Für Vast.ai-Verifikation (sehr hohe Einnahmen) werden 500+ Mbit/s symmetrisch empfohlen — das geht nur mit Glasfaser.</p>
+        <p class="en">For bandwidth sharing, normal DSL with 10+ Mbit/s upload is sufficient. For GPU rental on Clore.ai, asymmetric DSL (e.g. 40 Mbit/s upload) is adequate. For Akash Network and Render Network, more upload is better — 100+ Mbit/s recommended. For Vast.ai verification (very high earnings), 500+ Mbit/s symmetric is recommended — only possible with fiber.</p>
+      </div>
+    </div>
+    <div class="faq-item">
+      <div class="faq-question" onclick="toggleFaq(this)">
+        <span class="de">Muss ich in Deutschland ein Gewerbe anmelden?</span>
+        <span class="en">Do I need to register a business in Germany?</span>
+        <span class="faq-arrow">+</span>
+      </div>
+      <div class="faq-answer">
+        <p class="de">In Deutschland: Ja, wenn du regelmäßig Einnahmen erzielst. Als Kleinunternehmer (§19 UStG) bist du bis €22.000 Jahresumsatz von der Umsatzsteuer befreit. Gewerbeanmeldung: ca. €20–50 beim Gewerbeamt. Wichtig: Hardware kann als Betriebsausgabe abgeschrieben werden (AfA). Krypto-Einnahmen sind als Einkünfte aus sonstigen Leistungen steuerpflichtig — alle Transaktionen dokumentieren! Bitte einen Steuerberater konsultieren.</p>
+        <p class="en">In Germany: Yes, if you regularly generate income. As a small business (§19 UStG) you are exempt from VAT up to €22,000 annual turnover. Business registration: about €20–50 at the trade office. Important: hardware can be depreciated as a business expense. Crypto income is taxable as income from other services — document all transactions! Please consult a tax advisor.</p>
+      </div>
+    </div>
+    <div class="faq-item">
+      <div class="faq-question" onclick="toggleFaq(this)">
+        <span class="de">Wie sicher ist mein System, wenn Fremde meine GPU nutzen?</span>
+        <span class="en">How secure is my system when strangers use my GPU?</span>
+        <span class="faq-arrow">+</span>
+      </div>
+      <div class="faq-answer">
+        <p class="de">GPU-Rental-Plattformen nutzen Container-Isolation (Docker) — Mieter arbeiten in einer vollständig isolierten Umgebung und können nicht auf dein Host-Betriebssystem zugreifen. Trotzdem empfehlen wir: starke Firewall-Regeln, SSH-Key-only-Authentifizierung, regelmäßige Updates und ein dediziertes System ausschließlich für den Node. Bandwidth-Sharing-Apps sind noch simpler: sie teilen nur Bandbreite, kein Dateizugriff.</p>
+        <p class="en">GPU rental platforms use container isolation (Docker) — renters work in a completely isolated environment and cannot access your host operating system. We still recommend: strong firewall rules, SSH-key-only authentication, regular updates and a dedicated system exclusively for the node. Bandwidth sharing apps are even simpler: they only share bandwidth, no file access.</p>
+      </div>
+    </div>
+  </div>
+</section>
+
+
+<!-- DOWNLOAD / SHOP -->
+<section id="download" style="padding: 6rem 4rem;">
+  <span class="section-label de">Download & Preise</span>
+  <span class="section-label en">Download & Pricing</span>
+  <h2 class="section-title">
+    <span class="de">Wähle deinen<br><em>Einstieg</em></span>
+    <span class="en">Choose your<br><em>start</em></span>
+  </h2>
+  <p class="section-sub">
+    <span class="de">Vom kostenlosen Script bis zum fertigen Plug-and-Play Image — starte in wenigen Minuten.</span>
+    <span class="en">From the free script to the ready-made plug-and-play image — start in minutes.</span>
+  </p>
+
+  <div class="shop-grid reveal">
+
+    <!-- FREE TIER -->
+    <div class="shop-card">
+      <div class="shop-badge free">Kostenlos / Free</div>
+      <div class="shop-title de">Script-Installation</div>
+      <div class="shop-title en">Script Install</div>
+      <div class="shop-price">€0 <span>/ für immer</span></div>
+      <ul class="shop-features">
+        <li class="de">install.sh — interaktiver Installer</li>
+        <li class="en">install.sh — interactive installer</li>
+        <li class="de">8 Bandwidth-Apps vorkonfiguriert</li>
+        <li class="en">8 bandwidth apps preconfigured</li>
+        <li class="de">Web-Dashboard mit Share-Funktion</li>
+        <li class="en">Web dashboard with share feature</li>
+        <li class="de">Automatische Updates via Watchtower</li>
+        <li class="en">Automatic updates via Watchtower</li>
+        <li class="de">DNS-Leak-Fix & optimierte Ressourcen</li>
+        <li class="en">DNS leak fix & optimized resources</li>
+        <li class="missing de">Eigenes Pi OS nötig</li>
+        <li class="missing en">Own Pi OS required</li>
+        <li class="missing de">Manuelles Setup (~15 Minuten)</li>
+        <li class="missing en">Manual setup (~15 minutes)</li>
+      </ul>
+      <a href="https://github.com/passivecompute/passivestack/releases/latest" target="_blank" class="shop-btn secondary de">
+        Download ZIP ↗
+      </a>
+      <a href="https://github.com/passivecompute/passivestack/releases/latest" target="_blank" class="shop-btn secondary en">
+        Download ZIP ↗
+      </a>
+      <p class="shop-note de">Keine Registrierung nötig</p>
+      <p class="shop-note en">No registration required</p>
+    </div>
+
+    <!-- PAID TIER -->
+    <div class="shop-card featured">
+      <div class="shop-badge">⚡ Plug & Play Image</div>
+      <div class="shop-title de">Fertiges Pi-Image</div>
+      <div class="shop-title en">Ready Pi Image</div>
+      <div class="shop-price">€9,99 <span>/ einmalig</span></div>
+      <ul class="shop-features">
+        <li class="de">Alles aus der kostenlosen Version</li>
+        <li class="en">Everything from the free version</li>
+        <li class="de">Raspberry Pi OS vorinstalliert</li>
+        <li class="en">Raspberry Pi OS preinstalled</li>
+        <li class="de">Docker & alle Dependencies inkl.</li>
+        <li class="en">Docker & all dependencies included</li>
+        <li class="de">PassiveStack direkt beim ersten Boot</li>
+        <li class="en">PassiveStack starts on first boot</li>
+        <li class="de">sysctl & cgroup optimiert</li>
+        <li class="en">sysctl & cgroup optimized</li>
+        <li class="de">Auf SD-Karte flashen → einschalten → fertig</li>
+        <li class="en">Flash to SD → power on → done</li>
+        <li class="de">Kein technisches Wissen nötig</li>
+        <li class="en">No technical knowledge required</li>
+      </ul>
+      <a href="https://buy.stripe.com/passivestack-image" target="_blank" class="shop-btn primary de">
+        Jetzt kaufen — €9,99 ↗
+      </a>
+      <a href="https://buy.stripe.com/passivestack-image" target="_blank" class="shop-btn primary en">
+        Buy now — €9.99 ↗
+      </a>
+      <p class="shop-note de">Sofort-Download nach Zahlung · Stripe gesichert</p>
+      <p class="shop-note en">Instant download after payment · Secured by Stripe</p>
+    </div>
+
+  </div>
+
+  <!-- Install-Befehl -->
+  <div style="margin-top: 3rem; background: var(--bg2); border: 1px solid var(--border2); border-radius: 12px; padding: 1.5rem 2rem;">
+    <p style="font-family: 'DM Mono', monospace; font-size: 0.75rem; color: var(--text3); margin-bottom: 0.75rem;" class="de">SCHNELLSTART — SCRIPT VERSION</p>
+    <p style="font-family: 'DM Mono', monospace; font-size: 0.75rem; color: var(--text3); margin-bottom: 0.75rem;" class="en">QUICK START — SCRIPT VERSION</p>
+    <code style="font-family: 'DM Mono', monospace; font-size: 0.9rem; color: var(--solar);">
+      curl -fsSL https://passivecompute.de/bootstrap | bash
+    </code>
+    <p style="font-size: 0.8rem; color: var(--text3); margin-top: 0.75rem; font-family: 'DM Mono', monospace;" class="de">Installiert Docker + PassiveStack auf frischem Raspberry Pi OS</p>
+    <p style="font-size: 0.8rem; color: var(--text3); margin-top: 0.75rem; font-family: 'DM Mono', monospace;" class="en">Installs Docker + PassiveStack on fresh Raspberry Pi OS</p>
+  </div>
+</section>
+
+<footer>
+  <div>
+    <div class="footer-logo">Passive<span>Compute</span>.de</div>
+    <p style="font-size: 0.8rem; color: var(--text3); margin-top: 0.5rem;" class="de">Solar-betriebenes passives Einkommen. Made in Germany.</p>
+    <p style="font-size: 0.8rem; color: var(--text3); margin-top: 0.5rem;" class="en">Solar-powered passive income. Made in Germany.</p>
+    <p style="font-size: 0.75rem; color: var(--text3); margin-top: 0.25rem; font-family: 'DM Mono', monospace;" class="de">Diese Seite enthält Referral-Links. Wir erhalten Provisionen ohne Mehrkosten für dich.</p>
+    <p style="font-size: 0.75rem; color: var(--text3); margin-top: 0.25rem; font-family: 'DM Mono', monospace;" class="en">This site contains referral links. We receive commissions at no extra cost to you.</p>
+  </div>
+  <div style="text-align: right;">
+    <div class="footer-note de">* Keine Finanzberatung. Alle Angaben ohne Gewähr. Einnahmen variieren.</div>
+    <div class="footer-note en">* Not financial advice. All information without guarantee. Earnings vary.</div>
+    <div class="footer-note" style="margin-top: 0.5rem;">© 2026 PassiveCompute.de</div>
+  </div>
+</footer>
+
+<script>
+  function setLang(lang) {
+    document.body.className = lang === 'en' ? 'lang-en' : '';
+    document.querySelectorAll('.lang-btn').forEach(btn => btn.classList.remove('active'));
+    document.querySelector(`.lang-btn[onclick="setLang('${lang}')"]`).classList.add('active');
+    localStorage.setItem('lang', lang);
+  }
+  const savedLang = localStorage.getItem('lang');
+  if (savedLang) setLang(savedLang);
+
+  function toggleFaq(el) {
+    el.parentElement.classList.toggle('open');
+  }
+
+  const observer = new IntersectionObserver((entries) => {
+    entries.forEach(entry => { if (entry.isIntersecting) entry.target.classList.add('visible'); });
+  }, { threshold: 0.1 });
+  document.querySelectorAll('.reveal').forEach(el => observer.observe(el));
+</script>
+</body>
+</html>
