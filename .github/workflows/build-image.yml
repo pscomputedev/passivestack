@@ -27,7 +27,7 @@ jobs:
           image-name: PassiveStack-v1.3
 
           # Raspberry Pi OS Lite (kein Desktop)
-          stage-list: stage0 stage1 stage2 stage-passivestack
+          stage-list: stage0 stage1 stage2
 
           # Deutsch, Berlin, Bookworm
           locale: de_DE.UTF-8
