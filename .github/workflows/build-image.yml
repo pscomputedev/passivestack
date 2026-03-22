@@ -3,63 +3,65 @@ name: Build PassiveStack Pi Image
 on:
   push:
     branches: [ main ]
-    paths:
-      - 'config/**'
-      - 'install.sh'
-      - 'bootstrap.sh'
-      - '.github/workflows/build-image.yml'
-  workflow_dispatch:  # Manueller Start über GitHub UI
+  workflow_dispatch:
 
 jobs:
   build:
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-22.04
     timeout-minutes: 120
 
     steps:
       - name: Repository auschecken
         uses: actions/checkout@v4
 
-      - name: PassiveStack Pi-Image bauen
-        uses: usimd/pi-gen-action@v1
-        id: build
-        with:
-          # Image-Name
-          image-name: PassiveStack-v1.3
+      - name: Dependencies installieren
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y \
+            coreutils quilt parted qemu-user-static debootstrap \
+            zerofree zip dosfstools libcap2-bin rsync xz-utils \
+            file git curl bc
 
-          # Raspberry Pi OS Lite (kein Desktop)
-          stage-list: stage0 stage1 stage2
+      - name: pi-gen klonen
+        run: |
+          git clone --depth 1 https://github.com/RPi-Distro/pi-gen.git /tmp/pi-gen
 
-          # Deutsch, Berlin, Bookworm
-          locale: de_DE.UTF-8
-          timezone: Europe/Berlin
-          keyboard-keymap: de
-          keyboard-layout: German
+      - name: PassiveStack Stage einrichten
+        run: |
+          cp -r image/stage-passivestack /tmp/pi-gen/stage-passivestack
+          mkdir -p /tmp/pi-gen/stage-passivestack/00-passivestack/files
+          cp -r . /tmp/pi-gen/stage-passivestack/00-passivestack/files/passivestack/
+          touch /tmp/pi-gen/stage3/SKIP
+          touch /tmp/pi-gen/stage4/SKIP
+          touch /tmp/pi-gen/stage5/SKIP
+          touch /tmp/pi-gen/stage4/SKIP_IMAGES
+          touch /tmp/pi-gen/stage5/SKIP_IMAGES
 
-          # Standard Pi-User
-          username: pi
-          password: passivestack
+      - name: pi-gen Config erstellen
+        run: |
+          cat > /tmp/pi-gen/config << 'EOF2'
+          IMG_NAME="PassiveStack-v1.3"
+          RELEASE="bookworm"
+          TARGET_HOSTNAME="passivestack"
+          FIRST_USER_NAME="pi"
+          FIRST_USER_PASS="passivestack"
+          ENABLE_SSH=1
+          KEYBOARD_KEYMAP="de"
+          KEYBOARD_LAYOUT="German"
+          TIMEZONE_DEFAULT="Europe/Berlin"
+          LOCALE_DEFAULT="de_DE.UTF-8"
+          STAGE_LIST="stage0 stage1 stage2 stage-passivestack"
+          COMPRESS="xz"
+          EOF2
 
-          # SSH aktivieren
-          enable-ssh: 1
+      - name: Pi-Image bauen
+        run: |
+          cd /tmp/pi-gen
+          sudo bash build.sh
 
-          # Hostname
-          hostname: passivestack
-
-          # Komprimierung
-          compression: xz
-          compression-level: 6
-
-          # pi-gen Version
-          pi-gen-version: arm64
-
-          # Extra Stage mit PassiveStack
-          extra-host-dependencies: git
-          extra-host-modules: ''
-          increase-runner-disk-size: true
-
-      - name: Image hochladen als Artifact
+      - name: Image hochladen
         uses: actions/upload-artifact@v4
         with:
           name: PassiveStack-Pi-Image
-          path: ${{ steps.build.outputs.image-path }}
+          path: /tmp/pi-gen/deploy/*.img.xz
           retention-days: 90
