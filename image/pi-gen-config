@@ -1,0 +1,39 @@
+#!/usr/bin/env bash
+# ============================================================
+# PassiveStack — pi-gen Image Build Konfiguration
+#
+# Voraussetzungen (auf Ubuntu/Debian Build-System):
+#   sudo apt install coreutils quilt parted qemu-user-static \
+#     debootstrap zerofree zip dosfstools libcap2-bin rsync \
+#     xz-utils file git curl bc
+#
+# Nutzung:
+#   git clone https://github.com/RPi-Distro/pi-gen.git
+#   cp -r passivestack/image/stage-passivestack pi-gen/
+#   cp passivestack/image/pi-gen-config pi-gen/config
+#   cd pi-gen && bash build.sh
+# ============================================================
+
+# ── Image-Grundkonfiguration ─────────────────────────────────
+IMG_NAME="PassiveStack-v1.3"
+RELEASE="bookworm"
+TARGET_HOSTNAME="passivestack"
+FIRST_USER_NAME="pi"
+FIRST_USER_PASS="passivestack"   # Nutzer muss beim ersten Login ändern
+ENABLE_SSH=1
+KEYBOARD_KEYMAP="de"
+KEYBOARD_LAYOUT="German"
+TIMEZONE_DEFAULT="Europe/Berlin"
+LOCALE_DEFAULT="de_DE.UTF-8"
+WPA_ESSID=""
+WPA_PASSWORD=""
+WPA_COUNTRY="DE"
+
+# ── Build-Optionen ───────────────────────────────────────────
+# Nur Lite-Image (kein Desktop) — spart ~1 GB
+SKIP_IMAGES=""
+STAGE_LIST="stage0 stage1 stage2 stage-passivestack"
+
+# ── Komprimierung ────────────────────────────────────────────
+COMPRESS="xz"
+USE_QEMU=0
