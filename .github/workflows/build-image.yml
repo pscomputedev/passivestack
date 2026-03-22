@@ -53,8 +53,9 @@ jobs:
           pi-gen-version: arm64
 
           # Extra Stage mit PassiveStack
-          extra-host-dependencies: ''
+          extra-host-dependencies: git
           extra-host-modules: ''
+          increase-runner-disk-size: true
 
       - name: Image hochladen als Artifact
         uses: actions/upload-artifact@v4
