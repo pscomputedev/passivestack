@@ -28,7 +28,7 @@ jobs:
 
       - name: PassiveStack Stage einrichten
         run: |
-          cp -r passivestack/image/stage-passivestack /tmp/pi-gen/stage-passivestack
+          cp -r image/stage-passivestack /tmp/pi-gen/stage-passivestack
           mkdir -p /tmp/pi-gen/stage-passivestack/00-passivestack/files
           cp -r . /tmp/pi-gen/stage-passivestack/00-passivestack/files/passivestack/
           touch /tmp/pi-gen/stage3/SKIP
