@@ -21,6 +21,7 @@ jobs:
             coreutils quilt parted qemu-user-static qemu-utils kpartx \
             debootstrap zerofree zip dosfstools libcap2-bin rsync \
             xz-utils file git curl bc arch-test libarchive-tools \
+            quilt qemu-user-binfmt debootstrap libarchive-tools arch-test \
             sudo apt-get install -y arch-test || true
 
       - name: pi-gen klonen
