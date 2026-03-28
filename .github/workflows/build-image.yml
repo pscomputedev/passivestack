@@ -39,18 +39,18 @@ jobs:
 
       - name: pi-gen Config erstellen
         run: |
-          echo "IMG_NAME=PassiveStack-v1.3" > /tmp/pi-gen/config
-          echo "RELEASE=bookworm" >> /tmp/pi-gen/config
-          echo "TARGET_HOSTNAME=passivestack" >> /tmp/pi-gen/config
-          echo "FIRST_USER_NAME=pi" >> /tmp/pi-gen/config
-          echo "FIRST_USER_PASS=passivestack" >> /tmp/pi-gen/config
-          echo "ENABLE_SSH=1" >> /tmp/pi-gen/config
-          echo "KEYBOARD_KEYMAP=de" >> /tmp/pi-gen/config
-          echo "KEYBOARD_LAYOUT=German" >> /tmp/pi-gen/config
-          echo "TIMEZONE_DEFAULT=Europe/Berlin" >> /tmp/pi-gen/config
-          echo "LOCALE_DEFAULT=de_DE.UTF-8" >> /tmp/pi-gen/config
-          echo "STAGE_LIST=stage0 stage1 stage2 stage-passivestack" >> /tmp/pi-gen/config
-          echo "COMPRESS=xz" >> /tmp/pi-gen/config
+          echo 'IMG_NAME=PassiveStack-v1.3' > /tmp/pi-gen/config
+          echo 'RELEASE=bookworm' >> /tmp/pi-gen/config
+          echo 'TARGET_HOSTNAME=passivestack' >> /tmp/pi-gen/config
+          echo 'FIRST_USER_NAME=pi' >> /tmp/pi-gen/config
+          echo 'FIRST_USER_PASS=passivestack' >> /tmp/pi-gen/config
+          echo 'ENABLE_SSH=1' >> /tmp/pi-gen/config
+          echo 'KEYBOARD_KEYMAP=de' >> /tmp/pi-gen/config
+          echo 'KEYBOARD_LAYOUT=German' >> /tmp/pi-gen/config
+          echo 'TIMEZONE_DEFAULT=Europe/Berlin' >> /tmp/pi-gen/config
+          echo 'LOCALE_DEFAULT=de_DE.UTF-8' >> /tmp/pi-gen/config
+          echo 'STAGE_LIST="stage0 stage1 stage2 stage-passivestack"' >> /tmp/pi-gen/config
+          echo 'COMPRESS=xz' >> /tmp/pi-gen/config
 
       - name: Pi-Image bauen
         run: |
