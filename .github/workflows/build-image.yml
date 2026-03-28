@@ -20,7 +20,7 @@ jobs:
           sudo apt-get install -y \
             coreutils quilt parted qemu-user-static qemu-utils kpartx \
             debootstrap zerofree zip dosfstools libcap2-bin rsync \
-            xz-utils file git curl bc libarchive-tools arch-test
+            xz-utils file git curl bc libarchive-tools
 
       - name: pi-gen klonen
         run: |
@@ -55,4 +55,12 @@ jobs:
       - name: Pi-Image bauen
         run: |
           cd /tmp/pi-gen
-          sudo
+          chmod +x build.sh
+          sudo ./build.sh
+
+      - name: Image hochladen
+        uses: actions/upload-artifact@v4
+        with:
+          name: PassiveStack-Pi-Image
+          path: /tmp/pi-gen/deploy/
+          retention-days: 90
