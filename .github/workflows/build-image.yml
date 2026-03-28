@@ -1,55 +1,38 @@
-name: Build PassiveStack Pi Image
+name: Build PassiveStack Image
 
-on:
-  push:
-    branches: [ main ]
-  workflow_dispatch:
+on: 
+  workflow_dispatch:  # Manueller Start über Button
 
 jobs:
   build:
-    runs-on: ubuntu-22.04
-    timeout-minutes: 120
-
+    runs-on: ubuntu-22.04  # Wichtig: 22.04, nicht latest! [4][17]
+    
     steps:
-      - name: Repository auschecken
+      - name: Checkout repository
         uses: actions/checkout@v4
         
-      - name: Dependencies installieren
+      - name: Checkout pi-gen
+        run: |
+          rm -rf /tmp/pi-gen
+          git clone --depth 1 --branch bookworm https://github.com/RPi-Distro/pi-gen.git /tmp/pi-gen
+
+      - name: Install dependencies
         run: |
           sudo apt-get update
           sudo apt-get install -y \
-            coreutils quilt parted qemu-user-binfmt qemu-utils kpartx \
+            coreutils quilt parted qemu-user-static qemu-utils kpartx \
             debootstrap zerofree zip dosfstools libcap2-bin rsync \
-            xz-utils file git curl bc libarchive-tools arch-test
+            xz-utils file git curl bc libarchive-tools
           sudo apt-get install -y arch-test || true
 
-      - name: pi-gen klonen
+      - name: Cleanup previous builds
         run: |
-          git clone --depth 1 https://github.com/RPi-Distro/pi-gen.git /tmp/pi-gen
+          sudo rm -rf /tmp/pi-gen/work
 
-      - name: PassiveStack Stage einrichten
-        run: |
-          cp -r image/stage-passivestack /tmp/pi-gen/stage-passivestack
-          mkdir -p /tmp/pi-gen/stage-passivestack/00-passivestack/files
-          cp -r . /tmp/pi-gen/stage-passivestack/00-passivestack/files/passivestack/
-          touch /tmp/pi-gen/stage3/SKIP
-          touch /tmp/pi-gen/stage4/SKIP
-          touch /tmp/pi-gen/stage5/SKIP
-          touch /tmp/pi-gen/stage4/SKIP_IMAGES
-          touch /tmp/pi-gen/stage5/SKIP_IMAGES
-
-      - name: Config kopieren
-        run: cp config /tmp/pi-gen/config
-
-      - name: Pi-Image bauen
+      - name: Configure and build
         run: |
           cd /tmp/pi-gen
-          chmod +x build.sh
-          sudo ./build.sh
-
-      - name: Image hochladen
-        uses: actions/upload-artifact@v4
-        with:
-          name: PassiveStack-Pi-Image
-          path: /tmp/pi-gen/deploy/
-          retention-days: 90
+          echo 'IMG_NAME=PassiveStack' > config
+          echo 'RELEASE=bookworm' >> config
+          echo 'TARGET_HOSTNAME=passivestack' >> config
+          sudo bash build.sh
