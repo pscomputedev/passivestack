@@ -18,9 +18,10 @@ jobs:
         run: |
           sudo apt-get update
           sudo apt-get install -y \
-            coreutils quilt parted qemu-user-static \
+            coreutils quilt parted qemu-user-static qemu-utils kpartx \
             debootstrap zerofree zip dosfstools libcap2-bin rsync \
-            xz-utils file git curl bc arch-test libarchive-tools
+            xz-utils file git curl bc arch-test libarchive-tools \
+            sudo apt-get install -y arch-test || true
 
       - name: pi-gen klonen
         run: |
@@ -40,18 +41,18 @@ jobs:
       - name: pi-gen Config erstellen
         run: |
           cat > /tmp/pi-gen/config << 'EOF2'
-          IMG_NAME="PassiveStack-v1.3"
-          RELEASE="bookworm"
-          TARGET_HOSTNAME="passivestack"
-          FIRST_USER_NAME="pi"
-          FIRST_USER_PASS="passivestack"
+          IMG_NAME=PassiveStack-v1.3
+          RELEASE=bookworm
+          TARGET_HOSTNAME=passivestack
+          FIRST_USER_NAME=pi
+          FIRST_USER_PASS=passivestack
           ENABLE_SSH=1
-          KEYBOARD_KEYMAP="de"
-          KEYBOARD_LAYOUT="German"
-          TIMEZONE_DEFAULT="Europe/Berlin"
-          LOCALE_DEFAULT="de_DE.UTF-8"
-          STAGE_LIST="stage0 stage1 stage2 stage-passivestack"
-          COMPRESS="xz"
+          KEYBOARD_KEYMAP=de
+          KEYBOARD_LAYOUT=German
+          TIMEZONE_DEFAULT=Europe/Berlin
+          LOCALE_DEFAULT=de_DE.UTF-8
+          STAGE_LIST=stage0 stage1 stage2 stage-passivestack
+          COMPRESS=xz
           EOF2
 
       - name: Pi-Image bauen
