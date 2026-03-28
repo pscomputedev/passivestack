@@ -20,8 +20,7 @@ jobs:
           sudo apt-get install -y \
             coreutils quilt parted qemu-user-static qemu-utils kpartx \
             debootstrap zerofree zip dosfstools libcap2-bin rsync \
-            xz-utils file git curl bc libarchive-tools
-          sudo apt-get install -y arch-test || true
+            xz-utils file git curl bc libarchive-tools arch-test || true
 
       - name: pi-gen klonen
         run: |
