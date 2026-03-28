@@ -40,7 +40,7 @@ jobs:
 
       - name: pi-gen Config erstellen
         run: |
-          cat > /tmp/pi-gen/config << 'EOF'
+          cat > /tmp/pi-gen/config << 'EOF2'
 IMG_NAME=PassiveStack-v1.3
 RELEASE=bookworm
 TARGET_HOSTNAME=passivestack
@@ -53,7 +53,7 @@ TIMEZONE_DEFAULT=Europe/Berlin
 LOCALE_DEFAULT=de_DE.UTF-8
 STAGE_LIST=stage0 stage1 stage2 stage-passivestack
 COMPRESS=xz
-EOF
+EOF2
 
       - name: Pi-Image bauen
         run: |
