@@ -18,9 +18,9 @@ jobs:
         run: |
           sudo apt-get update
           sudo apt-get install -y \
-            coreutils quilt parted qemu-user-static qemu-utils kpartx \
+            coreutils quilt parted qemu-user-binfmt qemu-utils kpartx \
             debootstrap zerofree zip dosfstools libcap2-bin rsync \
-            xz-utils file git curl bc libarchive-tools
+            xz-utils file git curl bc libarchive-tools arch-test
           sudo apt-get install -y arch-test || true
 
       - name: pi-gen klonen
