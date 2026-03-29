@@ -15,7 +15,7 @@ jobs:
           sudo ln -s /usr/bin/qemu-arm-static /usr/local/bin/qemu-arm
 
       - name: Clone pi-gen (bookworm branch)
-        run: git clone --depth 1 --branch arm/bookworm https://github.com/RPi-Distro/pi-gen.git
+        run: git clone --depth 1 --branch bookworm https://github.com/RPi-Distro/pi-gen.git
 
       - name: Configure build
         working-directory: pi-gen
