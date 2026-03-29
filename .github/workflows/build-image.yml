@@ -8,8 +8,10 @@ jobs:
     steps:
       - uses: actions/checkout@v4
 
-      - name: Install Docker (bereits vorhanden auf ubuntu-latest)
-        run: docker --version
+      - name: Install qemu-user-static
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y qemu-user-static
 
       - name: Clone pi-gen
         run: git clone --depth 1 https://github.com/RPi-Distro/pi-gen.git
@@ -32,8 +34,9 @@ jobs:
 
       - name: Build image via Docker
         working-directory: pi-gen
-        run: |
-          ./build-docker.sh
+        env:
+          PIGEN_DOCKER_OPTS: "-v /usr/bin/qemu-arm-static:/usr/bin/qemu-arm-static"
+        run: ./build-docker.sh
 
       - name: Upload artifact
         uses: actions/upload-artifact@v4
