@@ -1,15 +1,11 @@
 name: Build PassiveStack Image
 
 on:
-  push:
-    branches: [ main ]
-  pull_request:
-    branches: [ main ]
   workflow_dispatch:
 
 jobs:
   build:
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-22.04
     
     steps:
     - name: Checkout repository
@@ -20,7 +16,7 @@ jobs:
         sudo apt-get update
         sudo apt-get install -y coreutils quilt parted qemu-user-static debootstrap \
           zerofree zip dosfstools libarchive-tools libcap2-bin grep rsync xz-utils \
-          file git curl jq
+          file git curl jq arch-test || true
         
     - name: Clone pi-gen
       run: |
@@ -31,7 +27,7 @@ jobs:
         cat > pi-gen/config << 'EOF'
         IMG_NAME=PassiveStack-v1.3-arm64
         RELEASE=bullseye
-        DEPLOY_ZIP=0
+        DEPLOY_COMPRESSION=none
         LOCALE_DEFAULT=en_US.UTF-8
         TARGET_HOSTNAME=passivestack
         KEYBOARD_KEYMAP=us
@@ -41,8 +37,6 @@ jobs:
         FIRST_USER_PASS=passivestack
         WPA_COUNTRY=DE
         ENABLE_SSH=1
-        PUBKEY_SSH_FIRST_USER=""
-        PUBKEY_ONLY_SSH=0
         STAGE_LIST="stage0 stage1 stage2"
         EOF
         
@@ -57,7 +51,7 @@ jobs:
         echo "=== Current Directory ==="
         pwd
         echo "=== pi-gen contents ==="
-        ls -la pi-gen/
+        ls -la pi-gen/ || true
         echo "=== Search for img files ==="
         find . -name "*.img*" -type f 2>/dev/null || true
         
@@ -66,7 +60,7 @@ jobs:
       with:
         name: passivestack-image
         path: |
-          pi-gen/deploy/*.img.xz
           pi-gen/deploy/*.img
+          pi-gen/deploy/*.img.xz
         if-no-files-found: warn
         retention-days: 5
