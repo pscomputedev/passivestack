@@ -20,4 +20,53 @@ jobs:
       - name: Configure build
         working-directory: pi-gen
         run: |
+          # WICHTIG: Keine Einrückung — alle Zeilen linksbündig!
+          cat > config <<'EOF'
+IMG_NAME=raspios-bookworm
+RELEASE=bookworm
+DEPLOY_ZIP=1
+LOCALE_DEFAULT=de_DE.UTF-8
+TARGET_HOSTNAME=raspberrypi
+KEYBOARD_KEYMAP=de
+KEYBOARD_LAYOUT=German
+TIMEZONE_DEFAULT=Europe/Berlin
+FIRST_USER_NAME=pi
+FIRST_USER_PASS=raspberry
+ENABLE_SSH=1
+STAGE_LIST=stage0 stage1 stage2
+EOF
+
+      - name: Build image (nativ, ohne Docker)
+        working-directory: pi-gen
+        run: |
+          # pi-gen Docker-Einsatz vermeiden, da git fehlt — lieber direkt bauen
+          ./build.sh --image_size 3G || true
+
+      - name: Upload artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: raspios-image
+          path: pi-gen/deploy/*.zip
+          if-no-files-found: errorname: Build Raspberry Pi Image
+
+on:
+  workflow_dispatch:
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      
+      - name: Install required packages
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y qemu-user-static qemu-user-binfmt git
+
+      - name: Clone pi-gen
+        run: git clone --depth 1 https://github.com/RPi-Distro/pi-gen.git
+
+      - name: Configure build
+        working-directory: pi-gen
+        run: |
           # WICHTIG: Keine Einrückung — alle Ze
