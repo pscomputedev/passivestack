@@ -31,8 +31,18 @@ jobs:
           echo 'FIRST_USER_NAME=pi' >> config
           echo 'FIRST_USER_PASS=raspberry' >> config
           echo 'ENABLE_SSH=1' >> config
-          echo 'PUBKEY_ONLY_SSH=0' >> config
           echo 'STAGE_LIST="stage0 stage1 stage2"' >> config
+
+      - name: Patch sshd_config for password login
+        working-directory: pi-gen
+        run: |
+          mkdir -p stage2/01-sys-tweaks/files
+          cat >> stage2/01-sys-tweaks/01-run.sh << 'EOF'
+
+          # PassiveStack: Passwort-Login explizit aktivieren
+          sed -i 's/^#\?[[:blank:]]*PasswordAuthentication.*/PasswordAuthentication yes/' "${ROOTFS_DIR}/etc/ssh/sshd_config"
+          echo "PasswordAuthentication yes" >> "${ROOTFS_DIR}/etc/ssh/sshd_config"
+          EOF
 
       - name: Build image via Docker
         working-directory: pi-gen
