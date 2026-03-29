@@ -15,19 +15,19 @@ jobs:
       - working-directory: pi-gen
         run: |
           cat > config <<EOF
-          IMG_NAME=raspios-bookworm
-          RELEASE=bookworm
-          DEPLOY_ZIP=1
-          LOCALE_DEFAULT=de_DE.UTF-8
-          TARGET_HOSTNAME=raspberrypi
-          KEYBOARD_KEYMAP=de
-          KEYBOARD_LAYOUT=German
-          TIMEZONE_DEFAULT=Europe/Berlin
-          FIRST_USER_NAME=pi
-          FIRST_USER_PASS=raspberry
-          ENABLE_SSH=1
-          STAGE_LIST=stage0 stage1 stage2
-          EOF
+IMG_NAME=raspios-bookworm
+RELEASE=bookworm
+DEPLOY_ZIP=1
+LOCALE_DEFAULT=de_DE.UTF-8
+TARGET_HOSTNAME=raspberrypi
+KEYBOARD_KEYMAP=de
+KEYBOARD_LAYOUT=German
+TIMEZONE_DEFAULT=Europe/Berlin
+FIRST_USER_NAME=pi
+FIRST_USER_PASS=raspberry
+ENABLE_SSH=1
+STAGE_LIST=stage0 stage1 stage2
+EOF
       
       - working-directory: pi-gen
         run: ./build-docker.sh
