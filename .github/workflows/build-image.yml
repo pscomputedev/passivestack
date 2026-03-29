@@ -31,6 +31,7 @@ jobs:
           echo 'FIRST_USER_NAME=pi' >> config
           echo 'FIRST_USER_PASS=raspberry' >> config
           echo 'ENABLE_SSH=1' >> config
+          echo 'PUBKEY_ONLY_SSH=0' >> config
           echo 'STAGE_LIST="stage0 stage1 stage2"' >> config
 
       - name: Build image via Docker
