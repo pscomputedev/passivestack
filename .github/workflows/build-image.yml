@@ -1,46 +1,72 @@
 name: Build PassiveStack Image
 
-on: 
-  workflow_dispatch:  # Manueller Start über Button
+on:
+  push:
+    branches: [ main ]
+  pull_request:
+    branches: [ main ]
+  workflow_dispatch:
 
 jobs:
   build:
-    runs-on: ubuntu-22.04  # Wichtig: 22.04, nicht latest! [4][17]
+    runs-on: ubuntu-latest
     
     steps:
-      - name: Checkout repository
-        uses: actions/checkout@v4
+    - name: Checkout repository
+      uses: actions/checkout@v4
+      
+    - name: Install dependencies
+      run: |
+        sudo apt-get update
+        sudo apt-get install -y coreutils quilt parted qemu-user-static debootstrap \
+          zerofree zip dosfstools libarchive-tools libcap2-bin grep rsync xz-utils \
+          file git curl jq
         
-      - name: Checkout pi-gen
-        run: |
-          rm -rf /tmp/pi-gen
-          git clone --depth 1 --branch bookworm https://github.com/RPi-Distro/pi-gen.git /tmp/pi-gen
-
-      - name: Install dependencies
-        run: |
-          sudo apt-get update
-          sudo apt-get install -y \
-            coreutils quilt parted qemu-user-static qemu-utils kpartx \
-            debootstrap zerofree zip dosfstools libcap2-bin rsync \
-            xz-utils file git curl bc libarchive-tools
-          sudo apt-get install -y arch-test || true
-
-      - name: Cleanup previous builds
-        run: |
-          sudo rm -rf /tmp/pi-gen/work
-
-      - name: Configure and build
-        run: |
-          cd /tmp/pi-gen
-          echo 'IMG_NAME=PassiveStack' > config
-          echo 'RELEASE=bookworm' >> config
-          echo 'TARGET_HOSTNAME=passivestack' >> config
-          sudo bash build.sh
-
-      - name: Upload image artifact
-        uses: actions/upload-artifact@v4
-        with:
-          name: passivestack-image
-          path: /tmp/pi-gen/deploy/*.img.xz
-          if-no-files-found: error
-          retention-days: 5
+    - name: Clone pi-gen
+      run: |
+        git clone --depth 1 https://github.com/RPi-Distro/pi-gen.git
+        
+    - name: Configure PassiveStack build
+      run: |
+        cat > pi-gen/config << 'EOF'
+        IMG_NAME=PassiveStack-v1.3-arm64
+        RELEASE=bullseye
+        DEPLOY_ZIP=0
+        LOCALE_DEFAULT=en_US.UTF-8
+        TARGET_HOSTNAME=passivestack
+        KEYBOARD_KEYMAP=us
+        KEYBOARD_LAYOUT="English (US)"
+        TIMEZONE_DEFAULT=Europe/Berlin
+        FIRST_USER_NAME=admin
+        FIRST_USER_PASS=passivestack
+        WPA_COUNTRY=DE
+        ENABLE_SSH=1
+        PUBKEY_SSH_FIRST_USER=""
+        PUBKEY_ONLY_SSH=0
+        STAGE_LIST="stage0 stage1 stage2"
+        EOF
+        
+    - name: Build image
+      run: |
+        cd pi-gen
+        sudo ./build.sh
+        
+    - name: Debug - Check build output
+      if: always()
+      run: |
+        echo "=== Current Directory ==="
+        pwd
+        echo "=== pi-gen contents ==="
+        ls -la pi-gen/
+        echo "=== Search for img files ==="
+        find . -name "*.img*" -type f 2>/dev/null || true
+        
+    - name: Upload artifact
+      uses: actions/upload-artifact@v4
+      with:
+        name: passivestack-image
+        path: |
+          pi-gen/deploy/*.img.xz
+          pi-gen/deploy/*.img
+        if-no-files-found: warn
+        retention-days: 5
