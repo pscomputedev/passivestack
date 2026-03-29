@@ -1,66 +1,68 @@
-name: Build PassiveStack Image
+name: Build Raspberry Pi Image
 
 on:
   workflow_dispatch:
+  push:
+    branches: [main]
 
 jobs:
   build:
-    runs-on: ubuntu-22.04
-    
+    runs-on: ubuntu-latest
+    container:
+      image: debian:bookworm-slim
+      options: --privileged --volume /dev:/dev
+
     steps:
-    - name: Checkout repository
-      uses: actions/checkout@v4
-      
-    - name: Install dependencies
-      run: |
-        sudo apt-get update
-        sudo apt-get install -y coreutils quilt parted qemu-user-static debootstrap \
-          zerofree zip dosfstools libarchive-tools libcap2-bin grep rsync xz-utils \
-          file git curl jq arch-test || true
-        
-    - name: Clone pi-gen
-      run: |
-        git clone --depth 1 https://github.com/RPi-Distro/pi-gen.git
-        
-    - name: Configure PassiveStack build
-      run: |
-        printf '%s\n' \
-          'IMG_NAME=passivestack-arm64' \
-          'RELEASE=bullseye' \
-          'DEPLOY_COMPRESSION=none' \
-          'LOCALE_DEFAULT=en_US.UTF-8' \
-          'TARGET_HOSTNAME=passivestack' \
-          'KEYBOARD_KEYMAP=us' \
-          'KEYBOARD_LAYOUT="English (US)"' \
-          'TIMEZONE_DEFAULT=Europe/Berlin' \
-          'FIRST_USER_NAME=admin' \
-          'FIRST_USER_PASS=passivestack' \
-          'WPA_COUNTRY=DE' \
-          'ENABLE_SSH=1' \
-          'STAGE_LIST="stage0 stage1 stage2"' \
-          > pi-gen/config
-        
-    - name: Build image
-      run: |
-        cd pi-gen
-        sudo ./build.sh
-        
-    - name: Debug - Check build output
-      if: always()
-      run: |
-        echo "=== Current Directory ==="
-        pwd
-        echo "=== pi-gen contents ==="
-        ls -la pi-gen/ || true
-        echo "=== Search for img files ==="
-        find . -name "*.img*" -type f 2>/dev/null || true
-        
-    - name: Upload artifact
-      uses: actions/upload-artifact@v4
-      with:
-        name: passivestack-image
-        path: |
-          pi-gen/deploy/*.img
-          pi-gen/deploy/*.img.xz
-        if-no-files-found: warn
-        retention-days: 90
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Install all dependencies (Debian native)
+        run: |
+          apt-get update
+          apt-get install -y --no-install-recommends \
+            coreutils quilt parted qemu-user-binfmt debootstrap \
+            zerofree zip dosfstools libarchive-tools libcap2-bin \
+            grep rsync xz-utils file git curl jq arch-test \
+            fdisk gdisk kpartx bc
+          
+          # Verify installations
+          which update-binfmts
+          update-binfmts --version
+
+      - name: Clone and configure pi-gen
+        run: |
+          git clone --depth 1 https://github.com/RPi-Distro/pi-gen.git
+          cd pi-gen
+          
+          # Complete config
+          cat > config << 'EOF'
+          IMG_NAME=raspios-custom
+          RELEASE=bookworm
+          DEPLOY_ZIP=1
+          LOCALE_DEFAULT=de_DE.UTF-8
+          TARGET_HOSTNAME=raspberrypi
+          KEYBOARD_KEYMAP=de
+          KEYBOARD_LAYOUT="German"
+          TIMEZONE_DEFAULT=Europe/Berlin
+          FIRST_USER_NAME=pi
+          FIRST_USER_PASS=raspberry
+          ENABLE_SSH=1
+          PUBKEY_SSH_FIRST_USER=""
+          PUBKEY_ONLY_SSH=0
+          STAGE_LIST="stage0 stage1 stage2"
+          EOF
+
+      - name: Build image
+        run: |
+          cd pi-gen
+          chmod +x build.sh
+          ./build.sh
+        env:
+          CONTINUE: 1
+
+      - name: Upload artifacts
+        uses: actions/upload-artifact@v4
+        with:
+          name: raspios-image
+          path: pi-gen/deploy/*.zip
+          if-no-files-found: error
