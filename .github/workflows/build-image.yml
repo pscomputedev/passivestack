@@ -60,7 +60,3 @@ jobs:
       with:
         name: passivestack-image
         path: |
-          pi-gen/deploy/*.img
-          pi-gen/deploy/*.img.xz
-        if-no-files-found: warn
-        retention-days: 90
