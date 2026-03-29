@@ -34,6 +34,8 @@ jobs:
           cd /tmp/pi-gen
           echo 'IMG_NAME=PassiveStack' > config
           echo 'RELEASE=bookworm' >> config
+          echo 'TARGET_HOSTNAME=passivestack' >> config
+          sudo bash build.sh
 
       - name: Upload image artifact
         uses: actions/upload-artifact@v4
@@ -41,5 +43,4 @@ jobs:
           name: passivestack-image
           path: /tmp/pi-gen/deploy/*.img.xz
           if-no-files-found: error
-           echo 'TARGET_HOSTNAME=passivestack' >> config
-           sudo bash build.sh
+          retention-days: 5
