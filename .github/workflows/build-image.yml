@@ -31,7 +31,7 @@ jobs:
           echo 'FIRST_USER_NAME=pi' >> config
           echo 'FIRST_USER_PASS=raspberry' >> config
           echo 'ENABLE_SSH=1' >> config
-          echo 'STAGE_LIST="stage0 stage1"' >> config
+          echo 'STAGE_LIST="stage0 stage1 stage2"' >> config
 
       - name: Build image via Docker
         working-directory: pi-gen
@@ -43,5 +43,8 @@ jobs:
         uses: actions/upload-artifact@v4
         with:
           name: raspios-image
-          path: pi-gen/deploy/*.zip
+          path: |
+            pi-gen/deploy/*.zip
+            pi-gen/deploy/*.img
+            pi-gen/deploy/*.img.xz
           if-no-files-found: error
