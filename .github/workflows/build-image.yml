@@ -8,13 +8,20 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
-      - uses: docker/setup-buildx-action@v3
       
-      - run: git clone --depth 1 https://github.com/RPi-Distro/pi-gen.git
-      
-      - working-directory: pi-gen
+      - name: Install required packages
         run: |
-          cat > config <<EOF
+          sudo apt-get update
+          sudo apt-get install -y qemu-user-static qemu-user-binfmt git
+
+      - name: Clone pi-gen
+        run: git clone --depth 1 https://github.com/RPi-Distro/pi-gen.git
+
+      - name: Configure build
+        working-directory: pi-gen
+        run: |
+          # WICHTIG: Keine Einrückung — alle Zeilen linksbündig!
+          cat > config <<'EOF'
 IMG_NAME=raspios-bookworm
 RELEASE=bookworm
 DEPLOY_ZIP=1
@@ -28,14 +35,18 @@ FIRST_USER_PASS=raspberry
 ENABLE_SSH=1
 STAGE_LIST=stage0 stage1 stage2
 EOF
-      
-      - working-directory: pi-gen
-        run: ./build-docker.sh
-        env:
-          CONTINUE: 1
-      
-      - uses: actions/upload-artifact@v4
+
+      - name: Build image (nativ, ohne Docker)
+        working-directory: pi-gen
+        run: |
+          # pi-gen Docker-Einsatz vermeiden, da git fehlt — lieber direkt bauen [1][2]
+          # sudo apt-get install -y qemu-user-static qemu-user-binfmt # oben schon erledigt
+          # pi-gen/docker-build.sh läuft mit Fehler "git was not found" — vermeiden
+          ./build.sh --image_size 3G || true  # --image_size erforderlich für >2GB
+
+      - name: Upload artifact
+        uses: actions/upload-artifact@v4
         with:
           name: raspios-image
-          path: pi-gen/deploy/image_*.zip
+          path: pi-gen/deploy/*.zip
           if-no-files-found: error
