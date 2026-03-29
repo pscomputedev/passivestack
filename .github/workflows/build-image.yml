@@ -2,67 +2,38 @@ name: Build Raspberry Pi Image
 
 on:
   workflow_dispatch:
-  push:
-    branches: [main]
 
 jobs:
   build:
     runs-on: ubuntu-latest
-    container:
-      image: debian:bookworm-slim
-      options: --privileged --volume /dev:/dev
-
     steps:
-      - name: Checkout repository
-        uses: actions/checkout@v4
-
-      - name: Install all dependencies (Debian native)
+      - uses: actions/checkout@v4
+      - uses: docker/setup-buildx-action@v3
+      
+      - run: git clone --depth 1 https://github.com/RPi-Distro/pi-gen.git
+      
+      - working-directory: pi-gen
         run: |
-          apt-get update
-          apt-get install -y --no-install-recommends \
-            coreutils quilt parted qemu-user-binfmt debootstrap \
-            zerofree zip dosfstools libarchive-tools libcap2-bin \
-            grep rsync xz-utils file git curl jq arch-test \
-            fdisk gdisk kpartx bc
-          
-          # Verify installations
-          which update-binfmts
-          update-binfmts --version
-
-      - name: Clone and configure pi-gen
-        run: |
-          git clone --depth 1 https://github.com/RPi-Distro/pi-gen.git
-          cd pi-gen
-          
-          # Complete config
-          cat > config << 'EOF'
-          IMG_NAME=raspios-custom
-          RELEASE=bookworm
-          DEPLOY_ZIP=1
-          LOCALE_DEFAULT=de_DE.UTF-8
-          TARGET_HOSTNAME=raspberrypi
-          KEYBOARD_KEYMAP=de
-          KEYBOARD_LAYOUT="German"
-          TIMEZONE_DEFAULT=Europe/Berlin
-          FIRST_USER_NAME=pi
-          FIRST_USER_PASS=raspberry
-          ENABLE_SSH=1
-          PUBKEY_SSH_FIRST_USER=""
-          PUBKEY_ONLY_SSH=0
-          STAGE_LIST="stage0 stage1 stage2"
-          EOF
-
-      - name: Build image
-        run: |
-          cd pi-gen
-          chmod +x build.sh
-          ./build.sh
+          echo IMG_NAME=raspios-bookworm > config
+          echo RELEASE=bookworm >> config
+          echo DEPLOY_ZIP=1 >> config
+          echo LOCALE_DEFAULT=de_DE.UTF-8 >> config
+          echo TARGET_HOSTNAME=raspberrypi >> config
+          echo KEYBOARD_KEYMAP=de >> config
+          echo KEYBOARD_LAYOUT=German >> config
+          echo TIMEZONE_DEFAULT=Europe/Berlin >> config
+          echo FIRST_USER_NAME=pi >> config
+          echo FIRST_USER_PASS=raspberry >> config
+          echo ENABLE_SSH=1 >> config
+          echo STAGE_LIST=stage0 stage1 stage2 >> config
+      
+      - working-directory: pi-gen
+        run: ./build-docker.sh
         env:
           CONTINUE: 1
-
-      - name: Upload artifacts
-        uses: actions/upload-artifact@v4
+      
+      - uses: actions/upload-artifact@v4
         with:
           name: raspios-image
-          path: pi-gen/deploy/*.zip
+          path: pi-gen/deploy/image_*.zip
           if-no-files-found: error
