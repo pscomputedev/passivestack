@@ -24,8 +24,8 @@ jobs:
         
     - name: Configure PassiveStack build
       run: |
-        cat > pi-gen/config << 'EOF'
-        IMG_NAME=PassiveStack-v1.3-arm64
+        cat > pi-gen/config <<'EOF'
+        IMG_NAME=passivestack-arm64
         RELEASE=bullseye
         DEPLOY_COMPRESSION=none
         LOCALE_DEFAULT=en_US.UTF-8
@@ -59,4 +59,8 @@ jobs:
       uses: actions/upload-artifact@v4
       with:
         name: passivestack-image
-        path
+        path: |
+          pi-gen/deploy/*.img
+          pi-gen/deploy/*.img.xz
+        if-no-files-found: warn
+        retention-days: 90
