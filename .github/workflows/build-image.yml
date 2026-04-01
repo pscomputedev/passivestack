@@ -1,61 +1,91 @@
-name: Build Raspberry Pi Image
+name: Build PassiveStack Pi Image
+
 on:
   workflow_dispatch:
+  push:
+    tags:
+      - 'v*'
 
 jobs:
   build:
     runs-on: ubuntu-latest
-    steps:
-      - uses: actions/checkout@v4
+    timeout-minutes: 120
 
-      - name: Install qemu-user-static
+    steps:
+      - name: Checkout passivestack repo
+        uses: actions/checkout@v4
+        with:
+          path: passivestack
+
+      - name: Install build dependencies
         run: |
           sudo apt-get update
-          sudo apt-get install -y qemu-user-static
-          sudo ln -s /usr/bin/qemu-arm-static /usr/local/bin/qemu-arm
+          sudo apt-get install -y \
+            coreutils quilt parted qemu-user-static \
+            debootstrap zerofree zip dosfstools \
+            libcap2-bin rsync xz-utils file git curl bc \
+            kpartx udev
 
-      - name: Clone pi-gen (bookworm branch)
-        run: git clone --depth 1 --branch bookworm https://github.com/RPi-Distro/pi-gen.git
-
-      - name: Configure build
-        working-directory: pi-gen
+      - name: Clone pi-gen (bookworm)
         run: |
-          echo 'IMG_NAME=raspios-bookworm' > config
-          echo 'RELEASE=bookworm' >> config
-          echo 'DEPLOY_ZIP=1' >> config
-          echo 'LOCALE_DEFAULT=de_DE.UTF-8' >> config
-          echo 'TARGET_HOSTNAME=raspberrypi' >> config
-          echo 'KEYBOARD_KEYMAP=de' >> config
-          echo 'KEYBOARD_LAYOUT=German' >> config
-          echo 'TIMEZONE_DEFAULT=Europe/Berlin' >> config
-          echo 'FIRST_USER_NAME=pi' >> config
-          echo 'FIRST_USER_PASS=raspberry' >> config
-          echo 'ENABLE_SSH=1' >> config
-          echo 'STAGE_LIST="stage0 stage1 stage2"' >> config
+          git clone --depth 1 --branch bookworm \
+            https://github.com/RPi-Distro/pi-gen.git pi-gen
 
-      - name: Patch sshd_config for password login
-        working-directory: pi-gen
+      - name: Copy pi-gen config from repo
         run: |
-          mkdir -p stage2/01-sys-tweaks/files
-          cat >> stage2/01-sys-tweaks/01-run.sh << 'EOF'
+          cp passivestack/image/pi-gen-config pi-gen/config
+          grep -q '^DEPLOY_ZIP' pi-gen/config \
+            && sed -i 's/^DEPLOY_ZIP.*/DEPLOY_ZIP=0/' pi-gen/config \
+            || echo 'DEPLOY_ZIP=0' >> pi-gen/config
 
-          # PassiveStack: Passwort-Login explizit aktivieren
-          sed -i 's/^#\?[[:blank:]]*PasswordAuthentication.*/PasswordAuthentication yes/' "${ROOTFS_DIR}/etc/ssh/sshd_config"
-          echo "PasswordAuthentication yes" >> "${ROOTFS_DIR}/etc/ssh/sshd_config"
-          EOF
+      - name: Copy stage-passivestack into pi-gen
+        run: |
+          cp -r passivestack/image/stage-passivestack pi-gen/stage-passivestack
+
+      - name: Populate stage files from repo source
+        run: |
+          FILES_DIR="pi-gen/stage-passivestack/00-passivestack/files"
+          mkdir -p "${FILES_DIR}/passivestack/config"
+          mkdir -p "${FILES_DIR}/passivestack/image"
+
+          cp passivestack/install.sh          "${FILES_DIR}/passivestack/"
+          cp passivestack/bootstrap.sh        "${FILES_DIR}/passivestack/"
+          cp passivestack/generate-compose.py "${FILES_DIR}/passivestack/"
+          cp passivestack/status-updater.sh   "${FILES_DIR}/passivestack/" 2>/dev/null || true
+          cp passivestack/config/apps.json    "${FILES_DIR}/passivestack/config/" 2>/dev/null || true
+          cp passivestack/image/firstboot.sh                   "${FILES_DIR}/passivestack/image/"
+          cp passivestack/image/passivestack-firstboot.service "${FILES_DIR}/"
+
+          if [ -d passivestack/dashboard ]; then
+            cp -r passivestack/dashboard "${FILES_DIR}/passivestack/"
+          fi
+
+          echo "=== Files staged ==="
+          find "${FILES_DIR}" -type f | sort
+
+      - name: Fix prerun.sh permissions
+        run: chmod +x pi-gen/stage-passivestack/00-passivestack/prerun.sh
+
+      - name: Mark stages to skip (Lite, no desktop)
+        run: |
+          for stage in pi-gen/stage3 pi-gen/stage4 pi-gen/stage5; do
+            [ -d "$stage" ] && touch "${stage}/SKIP" || true
+          done
+          for stage in pi-gen/stage4 pi-gen/stage5; do
+            [ -d "$stage" ] && touch "${stage}/SKIP_IMAGES" || true
+          done
+          touch pi-gen/stage2/SKIP_IMAGES
 
       - name: Build image via Docker
         working-directory: pi-gen
-        env:
-          PIGEN_DOCKER_OPTS: "-v /usr/bin/qemu-arm-static:/usr/bin/qemu-arm-static"
-        run: ./build-docker.sh
+        run: sudo bash build-docker.sh
 
-      - name: Upload artifact
+      - name: Upload image artifact
         uses: actions/upload-artifact@v4
         with:
-          name: raspios-image
+          name: passivestack-pi-image
           path: |
-            pi-gen/deploy/*.zip
             pi-gen/deploy/*.img
             pi-gen/deploy/*.img.xz
           if-no-files-found: error
+          retention-days: 7
