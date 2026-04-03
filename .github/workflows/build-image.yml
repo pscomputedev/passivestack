@@ -1,4 +1,4 @@
-name: PassiveStack Pi-Image Workflow
+name: PassiveStack Pi-Image
 on:
   workflow_dispatch:
   push:
@@ -10,12 +10,12 @@ jobs:
     runs-on: ubuntu-latest
     timeout-minutes: 120
     steps:
-      - name: Checkout repo
+      - name: Checkout Repository (Fehlerbehebung!)
         uses: actions/checkout@v4
         with:
           fetch-depth: 1
-          ref: main  # ← DEINE BRANCH ANGEben!
-          
+          ref: main  # ✅ Explizit Branch angeben
+
       - name: Setup QEMU
         run: |
           sudo apt-get update
@@ -23,9 +23,9 @@ jobs:
           sudo rm -f /usr/local/bin/qemu-arm
           sudo ln -sf /usr/bin/qemu-arm-static /usr/local/bin/qemu-arm
 
-      - name: Setup pi-gen
+      - name: Setup pi-gen Konfiguration
         run: |
-          sudo rm -rf pi-gen || true
+          sudo rm -rf pi-gen/config || true
           mkdir -p pi-gen/config
           chmod 755 pi-gen/config
           echo "pi-gen-config" > pi-gen/config/pi-gen.conf
@@ -38,11 +38,27 @@ jobs:
           path: pi-gen
           fetch-depth: 1
 
-      - name: Copy stage-passivestack
+      - name: Copy passivestack-stage
         run: |
           mkdir -p pi-gen/stage-passivestack/00-passivestack/prerun
           chmod -R 755 pi-gen/stage-passivestack
 
+          # Kopiere deine passivestack-stages
           [ -d "passivestack/image/stage-passivestack" ] && \
             cp -r passivestack/image/stage-passivestack pi-gen/stage-passivestack || true
-          # ... (restliche Schritte gleich)
+
+          # Füge deine zusätzlichen stages hinzu
+          [ -d "passivestack/image/stage-other" ] && \
+            cp -r passivestack/image/stage-other pi-gen/stage-passivestack || true
+
+      - name: Run pi-gen build
+        run: |
+          cd pi-gen
+          ./scripts/pi-gen-config
+          ./scripts/pi-gen-arm64 buster passivestack || true
+
+      - name: Upload result
+        uses: actions/upload-artifact@v4
+        with:
+          name: pi-gen-passivestack
+          path: pi-gen/build/result/*
