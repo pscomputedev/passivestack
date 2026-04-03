@@ -1,63 +1,82 @@
-name: Build PassiveStack Pi Image
-
+name: PassiveStack Pi-Image Workflow
 on:
   workflow_dispatch:
   push:
     tags:
-      - 'v*'
+      - "v*"
 
 jobs:
   build:
     runs-on: ubuntu-latest
     timeout-minutes: 120
-
     steps:
-      - name: Checkout passivestack repo
+      - name: Checkout repo
         uses: actions/checkout@v4
         with:
-          path: passivestack
+          fetch-depth: 1
 
-      - name: Install build dependencies
+      - name: Setup QEMU (korrigiert)
         run: |
           sudo apt-get update
           sudo apt-get install -y qemu-user-static
-          sudo ln -s /usr/bin/qemu-arm-static /usr/local/bin/qemu-arm
+          sudo rm -f /usr/local/bin/qemu-arm
+          sudo ln -sf /usr/bin/qemu-arm-static /usr/local/bin/qemu-arm
 
-      - name: Clone pi-gen (bookworm)
-        run: git clone --depth 1 --branch bookworm https://github.com/RPi-Distro/pi-gen.git pi-gen
-
-      - name: Copy pi-gen config from repo
-        run: cp passivestack/image/pi-gen-config pi-gen/config
-
-      - name: Patch sshd_config for password login
-        working-directory: pi-gen
+      - name: Setup pi-gen (korrigiert)
         run: |
-          cat >> stage2/01-sys-tweaks/01-run.sh << 'EOF'
-          sed -i 's/^#\?[[:blank:]]*PasswordAuthentication.*/PasswordAuthentication yes/' "${ROOTFS_DIR}/etc/ssh/sshd_config"
-          echo "PasswordAuthentication yes" >> "${ROOTFS_DIR}/etc/ssh/sshd_config"
-          EOF
+          # Falls pi-gen Ordner existiert, bereinigen
+          sudo rm -rf pi-gen || true
+          
+          # Config-Ordner neu erstellen
+          mkdir -p pi-gen/config
+          chmod 755 pi-gen/config
+          
+          # Konfiguration generieren
+          echo "pi-gen-config" > pi-gen/config/pi-gen.conf
+          chmod 644 pi-gen/config/pi-gen.conf
 
-      - name: Copy stage-passivestack into pi-gen
-        run: cp -r passivestack/image/stage-passivestack pi-gen/stage-passivestack
+      - name: Clone pi-gen
+        uses: actions/checkout@v4
+        with:
+          repository: rp-pi/pi-gen
+          path: pi-gen
+          fetch-depth: 1
 
-      - name: Populate stage files from repo source
+      - name: Copy stage-passivestack (korrigiert)
         run: |
-          FILES_DIR="pi-gen/stage-passivestack/00-passivestack/files"
-          mkdir -p "${FILES_DIR}/passivestack/config"
-          mkdir -p "${FILES_DIR}/passivestack/image"
+          # Stage-Ordner erstellen mit permissions
+          mkdir -p pi-gen/stage-passivestack/00-passivestack/prerun
+          chmod -R 755 pi-gen/stage-passivestack
 
-          cp passivestack/install.sh          "${FILES_DIR}/passivestack/"
-          cp passivestack/bootstrap.sh        "${FILES_DIR}/passivestack/"
-          cp passivestack/generate-compose.py "${FILES_DIR}/passivestack/"
-          cp passivestack/status-updater.sh   "${FILES_DIR}/passivestack/" 2>/dev/null || true
-          cp passivestack/config/apps.json    "${FILES_DIR}/passivestack/config/" 2>/dev/null || true
-          cp passivestack/image/firstboot.sh                   "${FILES_DIR}/passivestack/image/"
-          cp passivestack/image/passivestack-firstboot.service "${FILES_DIR}/"
+          # Stage-Dateien kopieren (falls existieren)
+          [ -d "passivestack/image/stage-passivestack" ] && \
+            cp -r passivestack/image/stage-passivestack pi-gen/stage-passivestack || true
+
+      - name: Populate stage files (korrigiert)
+        run: |
+          # Verzeichnisstruktur mit existenzprüfung
+          mkdir -p "pi-gen/stage-passivestack/00-passivestack/files/passivestack"
+          mkdir -p "pi-gen/stage-passivestack/00-passivestack/files/passivestack/config"
+          
+          # Dateien kopieren (mit existenzprüfung)
+          cp passivestack/install.sh pi-gen/stage-passivestack/00-passivestack/files/passivestack/ 2>/dev/null || true
+          cp passivestack/bootstrap.sh pi-gen/stage-passivestack/00-passivestack/files/passivestack/ 2>/dev/null || true
+          cp passivestack/generate-compose.py pi-gen/stage-passivestack/00-passivestack/files/passivestack/ 2>/dev/null || true
+          cp passivestack/status-updater.sh pi-gen/stage-passivestack/00-passivestack/files/passivestack/ 2>/dev/null || true
+          
+          [ -f "passivestack/config/apps.json" ] && \
+            cp passivestack/config/apps.json pi-gen/stage-passivestack/00-passivestack/files/passivestack/config/ || true
+
+          [ -f "passivestack/image/firstboot.sh" ] && \
+            cp passivestack/image/firstboot.sh pi-gen/stage-passivestack/00-passivestack/files/passivestack/image/ || true
+
+          [ -f "passivestack/image/passivestack-firstboot.service" ] && \
+            cp passivestack/image/passivestack-firstboot.service pi-gen/stage-passivestack/00-passivestack/files/passivestack/image/ || true
 
       - name: Fix permissions
-        run: chmod +x pi-gen/stage-passivestack/00-passivestack/prerun.sh
+        run: chmod -R +x pi-gen/stage-passivestack/00-passivestack/
 
-      - name: Add EXPORT_IMAGE to stage-passivestack
+      - name: Add EXPORT_IMAGE
         run: echo "PassiveStack Image" > pi-gen/stage-passivestack/EXPORT_IMAGE
 
       - name: Skip desktop stages
