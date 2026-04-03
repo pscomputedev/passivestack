@@ -1,64 +1,125 @@
-name: PassiveStack Pi-Image
+name: PassiveStack Pi-Image Build
 on:
   workflow_dispatch:
+    inputs:
+      branch:
+        description: 'Branch zum Checkouten'
+        required: false
+        default: 'main'
+        type: choice
+        options:
+          - main
+          - master
+          - develop
   push:
     tags:
-      - "v*"
+      - 'v*'
+      - 'release-*'
 
 jobs:
   build:
     runs-on: ubuntu-latest
     timeout-minutes: 120
+    permissions:
+      contents: read
+      packages: read
+      statuses: write
+      id-token: write
+
     steps:
-      - name: Checkout Repository (Fehlerbehebung!)
+      - name: 🔍 Checkout Repository
         uses: actions/checkout@v4
         with:
           fetch-depth: 1
-          ref: main  # ✅ Explizit Branch angeben
+          ref: main  # ← Fix: Explizit Branch angeben
+          token: ${{ secrets.GITHUB_TOKEN }}  # ← Fix: Token für Private Repo
 
-      - name: Setup QEMU
+      - name: 📋 Repository Info
         run: |
-          sudo apt-get update
+          echo "Repository: ${{ github.repository }}"
+          echo "Branch: ${{ github.ref_name }}"
+          echo "Tag: ${{ github.ref_name }}"
+
+      - name: 🔧 Setup QEMU
+        run: |
+          sudo apt-get update -qq
           sudo apt-get install -y qemu-user-static
           sudo rm -f /usr/local/bin/qemu-arm
           sudo ln -sf /usr/bin/qemu-arm-static /usr/local/bin/qemu-arm
 
-      - name: Setup pi-gen Konfiguration
+      - name: 📁 Setup pi-gen Konfiguration
         run: |
           sudo rm -rf pi-gen/config || true
           mkdir -p pi-gen/config
           chmod 755 pi-gen/config
           echo "pi-gen-config" > pi-gen/config/pi-gen.conf
           chmod 644 pi-gen/config/pi-gen.conf
+          cat pi-gen/config/pi-gen.conf
 
-      - name: Clone pi-gen
+      - name: 📥 Clone pi-gen (Fork/Original)
         uses: actions/checkout@v4
         with:
           repository: rp-pi/pi-gen
           path: pi-gen
           fetch-depth: 1
+          ref: main  # ← Fix: Explizit Branch angeben
 
-      - name: Copy passivestack-stage
+      - name: 📂 Copy passivestack-stages
         run: |
-          mkdir -p pi-gen/stage-passivestack/00-passivestack/prerun
+          set -euo pipefail
+          
+          # Sicherstellen, dass stage-Verzeichnis existiert
+          mkdir -p pi-gen/stage-passivestack
           chmod -R 755 pi-gen/stage-passivestack
 
-          # Kopiere deine passivestack-stages
-          [ -d "passivestack/image/stage-passivestack" ] && \
-            cp -r passivestack/image/stage-passivestack pi-gen/stage-passivestack || true
+          # Deine stages kopieren
+          if [ -d "passivestack/image/stage-passivestack" ]; then
+            cp -r passivestack/image/stage-passivestack \
+                 pi-gen/stage-passivestack || echo "Stage existiert nicht"
+          else
+            echo "❌ Stage-Verzeichnis nicht gefunden"
+          fi
 
-          # Füge deine zusätzlichen stages hinzu
+          # Zusätzliche stages optional
           [ -d "passivestack/image/stage-other" ] && \
             cp -r passivestack/image/stage-other pi-gen/stage-passivestack || true
 
-      - name: Run pi-gen build
+          ls -la pi-gen/stage-passivestack/
+
+      - name: 🛠️ Run pi-gen Build
+        env:
+          DEBIAN_FRONTEND: noninteractive
         run: |
           cd pi-gen
+          echo "🔧 pi-gen Config:"
           ./scripts/pi-gen-config
+
+          echo "🚀 pi-gen ARM64 Build:"
           ./scripts/pi-gen-arm64 buster passivestack || true
 
-      - name: Upload result
+      - name: 📦 Upload Build-Resultate
         uses: actions/upload-artifact@v4
+        if: success()
         with:
-          name: pi-gen-passivestack
-          path: pi-gen/build/result/*
+          name: pi-gen-passivestack-${{ github.sha }}
+          path: |
+            pi-gen/build/result/*
+            !**/.gitignore
+          retention-days: 30
+          if-no-files-found: ignore
+
+      - name: 📝 Upload Log (für Debugging)
+        uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: build-logs-${{ github.sha }}
+          path: |
+            **/*.log
+            **/build.log
+          retention-days: 7
+
+      - name: ✅ Build erfolgreich
+        run: |
+          echo "✅ pi-gen Build abgeschlossen"
+          echo "📦 Image ist unter: pi-gen/build/result/*"
+          echo "📄 Version: $(ls pi-gen/build/result/ 2>/dev/null || echo 'Kein Image')"
