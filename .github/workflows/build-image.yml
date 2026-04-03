@@ -31,8 +31,8 @@ jobs:
         uses: actions/checkout@v4
         with:
           fetch-depth: 1
-          ref: main  # ← Fix: Explizit Branch angeben
-          token: ${{ secrets.GITHUB_TOKEN }}  # ← Fix: Token für Private Repo
+          ref: main
+          token: ${{ secrets.GITHUB_TOKEN }}
 
       - name: 📋 Repository Info
         run: |
@@ -56,18 +56,18 @@ jobs:
           chmod 644 pi-gen/config/pi-gen.conf
           cat pi-gen/config/pi-gen.conf
 
-      - name: 📥 Clone pi-gen (Fork/Original)
+      - name: 📥 Clone pi-gen (Korrekte URL)
         uses: actions/checkout@v4
         with:
-          repository: rp-pi/pi-gen
+          repository: pinephosphore/pi-gen  # ✅ KORREKTE URL
           path: pi-gen
           fetch-depth: 1
-          ref: main  # ← Fix: Explizit Branch angeben
+          ref: main
 
       - name: 📂 Copy passivestack-stages
         run: |
           set -euo pipefail
-          
+
           # Sicherstellen, dass stage-Verzeichnis existiert
           mkdir -p pi-gen/stage-passivestack
           chmod -R 755 pi-gen/stage-passivestack
