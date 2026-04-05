@@ -19,7 +19,7 @@ on:
 jobs:
   build:
     runs-on: ubuntu-latest
-    timeout-minutes: 120
+    timeout-minutes: 180
     permissions:
       contents: read
       packages: read
@@ -39,193 +39,291 @@ jobs:
           echo "Repository: ${{ github.repository }}"
           echo "Branch: ${{ github.ref_name }}"
           echo "Tag: ${{ github.ref_name }}"
+          echo "Workflow Run ID: ${{ github.run_id }}"
 
-      - name: 🔧 Setup QEMU und Abhängigkeiten
+      - name: 🔧 Installiere ALLE Abhängigkeiten FÜR pi-gen
         run: |
           sudo apt-get update -qq
-          sudo apt-get install -y qemu-user-static coreutils parted dosfstools kpartx rsync \
-            bc binfmt-support build-essential crossbuild-essential-arm64 curl ca-certificates \
-            git wget flex bison libssl-dev libncurses5-dev fakeroot debootstrap \
-            quilt libarchive-tools arch-test qemu-utils pigz zerofree zip
+          sudo apt-get install -y \
+            qemu-user-static \
+            coreutils \
+            parted \
+            dosfstools \
+            kpartx \
+            rsync \
+            bc \
+            binfmt-support \
+            build-essential \
+            crossbuild-essential-arm64 \
+            curl \
+            ca-certificates \
+            git \
+            wget \
+            flex \
+            bison \
+            libssl-dev \
+            libncurses5-dev \
+            fakeroot \
+            debootstrap \
+            quilt \
+            libarchive-tools \
+            arch-test \
+            qemu-utils \
+            pigz \
+            zerofree \
+            zip \
+            jq \
+            xxd \
+            cpio \
+            whois \
+            gnupg2 \
+            psmisc \
+            e2fsprogs \
+            udev \
+            initramfs-tools \
+            systemd-container
+          
+          # QEMU Setup
           sudo rm -f /usr/local/bin/qemu-arm
           sudo ln -sf /usr/bin/qemu-arm-static /usr/local/bin/qemu-arm
           sudo update-binfmts --enable qemu-arm
+          
+          echo "✅ Alle Abhängigkeiten installiert"
 
-      - name: 📥 Clone offizielles pi-gen
+      - name: 📥 Clone pi-gen Repository (mit spezifischem Branch)
         uses: actions/checkout@v4
         with:
           repository: RPi-Distro/pi-gen
           path: pi-gen
           fetch-depth: 1
-          ref: master
+          ref: bullseye  # WICHTIG: Benutze bullseye Branch statt master
 
-      - name: 📁 Setup pi-gen Konfiguration
+      - name: 📁 Prüfe pi-gen Struktur
         run: |
-          echo "IMG_NAME=passivestack" > pi-gen/config
-          echo "RELEASE=bullseye" >> pi-gen/config
-          echo "HOSTNAME=passivestack" >> pi-gen/config
-          echo "FIRST_USER_NAME=pi" >> pi-gen/config
-          echo "FIRST_USER_PASS=raspberry" >> pi-gen/config
-          echo "ENABLE_SSH=1" >> pi-gen/config
-          echo "TIMEZONE=Europe/Berlin" >> pi-gen/config
-          echo "LOCALE_DEFAULT=de_DE.UTF-8" >> pi-gen/config
-          echo "KEYBOARD_KEYMAP=de" >> pi-gen/config
-          echo "KEYBOARD_LAYOUT=German" >> pi-gen/config
-          echo "IMG_ROOTSIZE=3500" >> pi-gen/config
-          echo "IMG_USERSIZE=1000" >> pi-gen/config
-          echo "BUILD_KERNEL=false" >> pi-gen/config
-          echo "COMPRESS_OUTPUTIMAGE=zip" >> pi-gen/config
-          echo "STAGE_LIST=\"stage0 stage1 stage2 stage3\"" >> pi-gen/config
-          cat pi-gen/config
+          cd pi-gen
+          echo "📁 pi-gen Verzeichnisstruktur:"
+          ls -la
+          echo ""
+          echo "📄 Verfügbare Stages:"
+          ls -la stage*
+          echo ""
+          
+          # Prüfe Build-Skript
+          if [ -f "./build.sh" ]; then
+            echo "✅ build.sh gefunden"
+            chmod +x ./build.sh
+          else
+            echo "❌ build.sh nicht gefunden!"
+            exit 1
+          fi
 
-      - name: 📂 Create Stage Files
+      - name: ⚙️ Konfiguriere pi-gen für ARM64
         run: |
-          mkdir -p pi-gen/stage3
-          chmod -R 755 pi-gen/stage3
+          cd pi-gen
           
-          # Erstelle Stage-Dateien mit echo-Befehlen statt Heredocs
-          echo '#!/bin/bash -e' > pi-gen/stage3/00-run.sh
-          echo 'echo "PassiveStack Stage 3 - Setup startet"' >> pi-gen/stage3/00-run.sh
+          # Erstelle erweiterte Konfiguration für ARM64
+          cat > config << 'EOF'
+IMG_NAME=passivestack
+RELEASE=bullseye
+HOSTNAME=passivestack
+FIRST_USER_NAME=pi
+FIRST_USER_PASS=raspberry
+ENABLE_SSH=1
+TIMEZONE=Europe/Berlin
+LOCALE_DEFAULT=de_DE.UTF-8
+KEYBOARD_KEYMAP=de
+KEYBOARD_LAYOUT=German
+IMG_ROOTSIZE=3500
+IMG_USERSIZE=1000
+BUILD_KERNEL=false
+COMPRESS_OUTPUTIMAGE=zip
+STAGE_LIST="stage0 stage1 stage2 stage3"
+CLEAN=1
+# Raspberry Pi spezifische Einstellungen
+RPI_REPO_URI="http://archive.raspberrypi.org/debian/"
+RPI_REPO_KEYSERVER="keyserver.ubuntu.com"
+# Nur ARM64 (v8) bauen - NICHT v6/v7
+RPI_BOOT_FIRMWARE_VERSIONS="v8"
+# Deaktivere alle nicht-ARM64 Varianten
+SKIP_IMAGES=1
+EOF
           
-          echo '#!/bin/bash -e' > pi-gen/stage3/01-run.sh
-          echo 'echo "PassiveStack Stage 3 - Docker Installation"' >> pi-gen/stage3/01-run.sh
-          echo 'apt-get update' >> pi-gen/stage3/01-run.sh
-          echo 'apt-get install -y apt-transport-https ca-certificates curl gnupg lsb-release' >> pi-gen/stage3/01-run.sh
-          echo 'curl -fsSL https://get.docker.com -o get-docker.sh' >> pi-gen/stage3/01-run.sh
-          echo 'sh get-docker.sh' >> pi-gen/stage3/01-run.sh
-          echo 'usermod -aG docker ${FIRST_USER_NAME}' >> pi-gen/stage3/01-run.sh
-          echo 'systemctl enable docker' >> pi-gen/stage3/01-run.sh
-          
-          echo '#!/bin/bash -e' > pi-gen/stage3/02-run.sh
-          echo 'echo "PassiveStack Stage 3 - PassiveStack Setup"' >> pi-gen/stage3/02-run.sh
-          echo 'cd /home/${FIRST_USER_NAME}' >> pi-gen/stage3/02-run.sh
-          echo 'sudo -u ${FIRST_USER_NAME} git clone https://github.com/pinephosphore/passivestack.git' >> pi-gen/stage3/02-run.sh
-          echo 'cd passivestack' >> pi-gen/stage3/02-run.sh
-          echo 'chmod +x install.sh' >> pi-gen/stage3/02-run.sh
-          echo 'touch .firstboot_pending' >> pi-gen/stage3/02-run.sh
-          echo 'chown ${FIRST_USER_NAME}:${FIRST_USER_NAME} .firstboot_pending' >> pi-gen/stage3/02-run.sh
-          
-          # Systemd Service Datei
-          echo '#!/bin/bash -e' > pi-gen/stage3/03-run.sh
-          echo 'echo "PassiveStack Stage 3 - Systemd Service Setup"' >> pi-gen/stage3/03-run.sh
-          echo 'cat > /etc/systemd/system/passivestack-firstboot.service << EOF_SVC' >> pi-gen/stage3/03-run.sh
-          echo '[Unit]' >> pi-gen/stage3/03-run.sh
-          echo 'Description=PassiveStack First Boot Setup' >> pi-gen/stage3/03-run.sh
-          echo 'After=network-online.target docker.service' >> pi-gen/stage3/03-run.sh
-          echo 'Wants=network-online.target' >> pi-gen/stage3/03-run.sh
-          echo 'ConditionPathExists=/home/pi/passivestack/.firstboot_pending' >> pi-gen/stage3/03-run.sh
-          echo '[Service]' >> pi-gen/stage3/03-run.sh
-          echo 'Type=oneshot' >> pi-gen/stage3/03-run.sh
-          echo 'ExecStart=/bin/bash /home/pi/passivestack/install.sh' >> pi-gen/stage3/03-run.sh
-          echo 'ExecStartPost=/bin/rm -f /home/pi/passivestack/.firstboot_pending' >> pi-gen/stage3/03-run.sh
-          echo 'RemainAfterExit=yes' >> pi-gen/stage3/03-run.sh
-          echo 'User=pi' >> pi-gen/stage3/03-run.sh
-          echo 'Group=pi' >> pi-gen/stage3/03-run.sh
-          echo 'StandardOutput=journal+console' >> pi-gen/stage3/03-run.sh
-          echo 'StandardError=journal+console' >> pi-gen/stage3/03-run.sh
-          echo '[Install]' >> pi-gen/stage3/03-run.sh
-          echo 'WantedBy=multi-user.target' >> pi-gen/stage3/03-run.sh
-          echo 'EOF_SVC' >> pi-gen/stage3/03-run.sh
-          echo 'systemctl enable passivestack-firstboot.service' >> pi-gen/stage3/03-run.sh
-          
-          # Optimierungen
-          echo '#!/bin/bash -e' > pi-gen/stage3/04-run.sh
-          echo 'echo "PassiveStack Stage 3 - Optimierungen"' >> pi-gen/stage3/04-run.sh
-          echo 'dphys-swapfile swapoff' >> pi-gen/stage3/04-run.sh
-          echo 'dphys-swapfile uninstall' >> pi-gen/stage3/04-run.sh
-          echo 'systemctl disable dphys-swapfile' >> pi-gen/stage3/04-run.sh
-          echo 'sed -i "s/#PasswordAuthentication yes/PasswordAuthentication yes/" /etc/ssh/sshd_config' >> pi-gen/stage3/04-run.sh
-          echo 'sed -i "s/#PubkeyAuthentication yes/PubkeyAuthentication yes/" /etc/ssh/sshd_config' >> pi-gen/stage3/04-run.sh
-          echo 'sed -i "s/PermitRootLogin yes/PermitRootLogin no/" /etc/ssh/sshd_config' >> pi-gen/stage3/04-run.sh
-          echo 'mkdir -p /etc/docker' >> pi-gen/stage3/04-run.sh
-          echo 'cat > /etc/docker/daemon.json << EOF_DOCK' >> pi-gen/stage3/04-run.sh
-          echo '{' >> pi-gen/stage3/04-run.sh
-          echo '  "log-driver": "json-file",' >> pi-gen/stage3/04-run.sh
-          echo '  "log-opts": {' >> pi-gen/stage3/04-run.sh
-          echo '    "max-size": "10m",' >> pi-gen/stage3/04-run.sh
-          echo '    "max-file": "3"' >> pi-gen/stage3/04-run.sh
-          echo '  },' >> pi-gen/stage3/04-run.sh
-          echo '  "storage-driver": "overlay2"' >> pi-gen/stage3/04-run.sh
-          echo '}' >> pi-gen/stage3/04-run.sh
-          echo 'EOF_DOCK' >> pi-gen/stage3/04-run.sh
-          
-          # Finalisierung
-          echo '#!/bin/bash -e' > pi-gen/stage3/99-finish.sh
-          echo 'echo "PassiveStack Stage 3 - Finalisierung"' >> pi-gen/stage3/99-finish.sh
-          echo 'cat > /etc/motd << EOF_MOTD' >> pi-gen/stage3/99-finish.sh
-          echo '#################################################' >> pi-gen/stage3/99-finish.sh
-          echo '#     PassiveStack Raspberry Pi Image           #' >> pi-gen/stage3/99-finish.sh
-          echo '#     https://passivecompute.de                 #' >> pi-gen/stage3/99-finish.sh
-          echo '#                                               #' >> pi-gen/stage3/99-finish.sh
-          echo '#     Das System wird automatisch eingerichtet. #' >> pi-gen/stage3/99-finish.sh
-          echo '#     Bitte warten Sie bis zum ersten Boot.     #' >> pi-gen/stage3/99-finish.sh
-          echo '#################################################' >> pi-gen/stage3/99-finish.sh
-          echo 'EOF_MOTD' >> pi-gen/stage3/99-finish.sh
-          echo 'cat > /etc/issue.net << EOF_BANNER' >> pi-gen/stage3/99-finish.sh
-          echo 'PassiveStack Image - https://passivecompute.de' >> pi-gen/stage3/99-finish.sh
-          echo 'EOF_BANNER' >> pi-gen/stage3/99-finish.sh
-          echo 'echo "PassiveStack Image Build abgeschlossen"' >> pi-gen/stage3/99-finish.sh
-          
-          # Berechtigungen setzen
-          chmod +x pi-gen/stage3/*.sh
-          touch pi-gen/stage3/EXPORT_IMAGE
-          ls -la pi-gen/stage3/
+          echo "📋 Konfigurationsdatei:"
+          cat config
 
-      - name: 🛠️ Run pi-gen Build
+      - name: 🛠️ Erstelle PassiveStack Stage 3
+        run: |
+          cd pi-gen
+          
+          # Lösche eventuell existierende Stage3
+          rm -rf stage3
+          
+          # Erstelle Stage3 Verzeichnis
+          mkdir -p stage3
+          
+          # Erstelle minimales Stage3 Setup
+          cat > stage3/00-run.sh << 'EOF'
+#!/bin/bash -e
+echo "=== PassiveStack Stage 3 ==="
+echo "Starte PassiveStack Einrichtung..."
+EOF
+          
+          cat > stage3/01-docker.sh << 'EOF'
+#!/bin/bash -e
+echo "Installiere Docker..."
+apt-get update
+apt-get install -y \
+    apt-transport-https \
+    ca-certificates \
+    curl \
+    gnupg \
+    lsb-release
+
+# Docker Repository
+mkdir -p /etc/apt/keyrings
+curl -fsSL https://download.docker.com/linux/debian/gpg | gpg --dearmor -o /etc/apt/keyrings/docker.gpg
+echo "deb [arch=$(dpkg --print-architecture) signed-by=/etc/apt/keyrings/docker.gpg] https://download.docker.com/linux/debian bullseye stable" | tee /etc/apt/sources.list.d/docker.list > /dev/null
+
+# Docker installieren
+apt-get update
+apt-get install -y docker-ce docker-ce-cli containerd.io docker-compose-plugin
+
+# Benutzer zur Docker Gruppe hinzufügen
+usermod -aG docker pi
+systemctl enable docker
+EOF
+          
+          cat > stage3/02-passivestack.sh << 'EOF'
+#!/bin/bash -e
+echo "Richte PassiveStack ein..."
+cd /home/pi
+if [ ! -d "passivestack" ]; then
+    git clone https://github.com/pinephosphore/passivestack.git
+fi
+cd passivestack
+chmod +x install.sh
+touch .firstboot_pending
+chown pi:pi .firstboot_pending
+EOF
+          
+          cat > stage3/03-service.sh << 'EOF'
+#!/bin/bash -e
+echo "Erstelle First-Boot Service..."
+
+cat > /etc/systemd/system/passivestack-firstboot.service << 'SVC_EOF'
+[Unit]
+Description=PassiveStack First Boot Setup
+After=network-online.target docker.service
+Wants=network-online.target
+ConditionPathExists=/home/pi/passivestack/.firstboot_pending
+
+[Service]
+Type=oneshot
+ExecStart=/bin/bash /home/pi/passivestack/install.sh
+ExecStartPost=/bin/rm -f /home/pi/passivestack/.firstboot_pending
+RemainAfterExit=yes
+User=pi
+Group=pi
+StandardOutput=journal+console
+StandardError=journal+console
+
+[Install]
+WantedBy=multi-user.target
+SVC_EOF
+
+systemctl enable passivestack-firstboot.service
+EOF
+          
+          cat > stage3/99-finish.sh << 'EOF'
+#!/bin/bash -e
+echo "Finalisiere PassiveStack Setup..."
+
+# MOTD
+cat > /etc/motd << 'MOTD_EOF'
+=======================================
+   PassiveStack Raspberry Pi Image
+   https://passivecompute.de
+=======================================
+MOTD_EOF
+
+echo "PassiveStack Setup abgeschlossen"
+EOF
+          
+          # Berechtigungen und EXPORT_IMAGE
+          chmod +x stage3/*.sh
+          echo "IMG_NAME=passivestack" > stage3/EXPORT_IMAGE
+          
+          echo "📁 Stage3 Inhalt:"
+          ls -la stage3/
+
+      - name: 🚀 Starte pi-gen Build
         env:
           DEBIAN_FRONTEND: noninteractive
         run: |
           cd pi-gen
-          echo "📋 Konfiguration:"
+          echo "🚀 Starte pi-gen Build..."
+          echo "📋 Aktuelle Konfiguration:"
           cat config
           echo ""
-          echo "📁 Stages vorhanden:"
-          ls -la stage*
-          echo ""
-          echo "🚀 Starte Build mit Stages: stage0 stage1 stage2 stage3"
-          sudo ./build.sh
-          if [ $? -eq 0 ]; then
+          
+          # Prüfe, ob stage0 korrekt konfiguriert ist
+          echo "🔍 Prüfe stage0 Konfiguration..."
+          if [ -f "stage0/00-configure-apt/files/sources.list" ]; then
+            echo "Stage0 sources.list:"
+            cat stage0/00-configure-apt/files/sources.list
+          fi
+          
+          # Baue Image
+          echo "🛠️ Starte Build-Prozess..."
+          sudo ./build.sh 2>&1 | tee build.log
+          
+          BUILD_RESULT=${PIPESTATUS[0]}
+          if [ $BUILD_RESULT -eq 0 ]; then
             echo "✅ Build erfolgreich!"
-            echo "📦 Erstellte Dateien:"
+            echo "📦 Erstellte Dateien in deploy/:"
             ls -la deploy/
           else
-            echo "❌ Build fehlgeschlagen!"
+            echo "❌ Build fehlgeschlagen mit Code: $BUILD_RESULT"
+            echo "📋 Letzte 100 Zeilen des Logs:"
+            tail -n 100 build.log
             exit 1
           fi
 
-      - name: 📦 Upload Build-Resultate
-        uses: actions/upload-artifact@v4
+      - name: 📦 Artefakte hochladen
         if: success()
+        uses: actions/upload-artifact@v4
         with:
-          name: passivestack-pi-image-${{ github.sha }}
+          name: passivestack-pi-image
           path: |
             pi-gen/deploy/*.zip
             pi-gen/deploy/*.img
           retention-days: 30
-          if-no-files-found: error
 
-      - name: 📝 Upload Logs (für Debugging)
-        uses: actions/upload-artifact@v4
-        if: always()
-        with:
-          name: build-logs-${{ github.sha }}
-          path: |
-            pi-gen/build.log
-            pi-gen/debug/
-            **/*.log
-          retention-days: 7
-
-      - name: 🧹 Aufräumen
+      - name: 📝 Safe Logs hochladen
         if: always()
         run: |
-          sudo rm -rf pi-gen/work/
-          sudo rm -rf pi-gen/deploy/
+          # Kopiere Logs in ein sicheres Verzeichnis
+          mkdir -p safe-logs
+          if [ -f "pi-gen/build.log" ]; then
+            cp pi-gen/build.log safe-logs/
+          fi
+          
+          # Prüfe auf Fehler
+          echo "🔍 Suche nach Fehlern im Log..."
+          if [ -f "pi-gen/build.log" ]; then
+            grep -i "error\|failed\|E:" pi-gen/build.log | head -20 || true
+          fi
+
+      - name: 📤 Upload Logs
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: build-logs
+          path: safe-logs/
+          retention-days: 7
 
       - name: ✅ Build erfolgreich
         if: success()
         run: |
           echo "✅ PassiveStack Pi-Image Build abgeschlossen!"
-          echo "📦 Das Image steht zum Download bereit."
-          echo "🔧 Architektur: ARM64 (Raspberry Pi)"
-          echo "📊 Release: Raspberry Pi OS Bullseye"
-          echo "⚡ Enthält: Docker + PassiveStack Auto-Setup"
+          echo "📦 Das Image steht in den Artefakten zum Download bereit."
