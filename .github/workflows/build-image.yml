@@ -15,33 +15,17 @@ jobs:
       - name: Checkout Repository
         uses: actions/checkout@v4
 
-      - name: Install pi-gen Dependencies
+      - name: Install Dependencies
         run: |
           sudo apt-get update
           sudo apt-get install -y \
-            git \
-            curl \
-            wget \
-            ca-certificates \
-            qemu-user-static \
-            parted \
-            dosfstools \
-            kpartx \
-            rsync \
-            bc \
-            binfmt-support \
-            build-essential \
-            crossbuild-essential-arm64 \
-            libssl-dev \
-            libncurses5-dev \
-            fakeroot \
-            debootstrap \
-            quilt \
-            libarchive-tools \
-            coreutils \
-            zerofree \
-            zip \
-            jq
+            git curl wget ca-certificates \
+            qemu-user-static parted dosfstools \
+            kpartx rsync bc binfmt-support \
+            build-essential crossbuild-essential-arm64 \
+            libssl-dev libncurses5-dev fakeroot \
+            debootstrap quilt libarchive-tools \
+            coreutils zerofree zip jq
 
       - name: Clone pi-gen
         run: |
@@ -49,50 +33,124 @@ jobs:
           cd pi-gen
           git checkout bullseye
 
-      - name: Setup PassiveStack Stage Directory
+      - name: Create Stage Directory
+        run: |
+          cd pi-gen
+          mkdir -p stage-passivestack
+          
+          # Erstelle run.sh OHNE Heredoc im YAML
+          echo '#!/bin/bash' > stage-passivestack/00-run.sh
+          echo 'set -e' >> stage-passivestack/00-run.sh
+          echo '' >> stage-passivestack/00-run.sh
+          echo 'echo "=== PassiveStack Installation ==="' >> stage-passivestack/00-run.sh
+          echo '' >> stage-passivestack/00-run.sh
+          echo '# Install Docker' >> stage-passivestack/00-run.sh
+          echo 'curl -fsSL https://get.docker.com -o get-docker.sh' >> stage-passivestack/00-run.sh
+          echo 'sh get-docker.sh' >> stage-passivestack/00-run.sh
+          echo 'rm get-docker.sh' >> stage-passivestack/00-run.sh
+          echo '' >> stage-passivestack/00-run.sh
+          echo '# Install Docker Compose' >> stage-passivestack/00-run.sh
+          echo 'DOCKER_COMPOSE_VERSION=$(curl -s https://api.github.com/repos/docker/compose/releases/latest | grep '"'"'tag_name'"'"' | cut -d"\"" -f4)' >> stage-passivestack/00-run.sh
+          echo 'curl -L "https://github.com/docker/compose/releases/download/${DOCKER_COMPOSE_VERSION}/docker-compose-$(uname -s)-$(uname -m)" -o /usr/local/bin/docker-compose' >> stage-passivestack/00-run.sh
+          echo 'chmod +x /usr/local/bin/docker-compose' >> stage-passivestack/00-run.sh
+          echo '' >> stage-passivestack/00-run.sh
+          echo '# Create directory' >> stage-passivestack/00-run.sh
+          echo 'mkdir -p /opt/passivestack' >> stage-passivestack/00-run.sh
+          echo '' >> stage-passivestack/00-run.sh
+          echo '# Set hostname' >> stage-passivestack/00-run.sh
+          echo 'echo "passivestack" > /etc/hostname' >> stage-passivestack/00-run.sh
+          echo 'hostnamectl set-hostname passivestack' >> stage-passivestack/00-run.sh
+          echo '' >> stage-passivestack/00-run.sh
+          echo '# Enable SSH' >> stage-passivestack/00-run.sh
+          echo 'touch /boot/ssh' >> stage-passivestack/00-run.sh
+          echo '' >> stage-passivestack/00-run.sh
+          echo 'echo "✅ PassiveStack configured"' >> stage-passivestack/00-run.sh
+          
+          chmod +x stage-passivestack/00-run.sh
+          echo "Created stage-passivestack/00-run.sh"
+
+      - name: Create Config
         run: |
           cd pi-gen
           
-          # Erstelle stage3-Verzeichnis für PassiveStack
-          if [ -d "stage-passivestack" ]; then
-            rm -rf stage-passivestack
+          echo 'IMG_NAME=passivestack' > config
+          echo 'RELEASE=bullseye' >> config
+          echo 'HOSTNAME=passivestack' >> config
+          echo 'FIRST_USER_NAME=pi' >> config
+          echo 'FIRST_USER_PASS=raspberry' >> config
+          echo 'ENABLE_SSH=1' >> config
+          echo 'STAGE_LIST="stage0 stage1 stage2 stage-passivestack"' >> config
+          echo 'CLEAN=1' >> config
+          echo 'DEPLOY_ZIP=1' >> config
+          
+          echo "Config:"
+          cat config
+
+      - name: Validate Setup
+        run: |
+          cd pi-gen
+          
+          echo "=== Validation ==="
+          
+          # Check files exist
+          REQUIRED_FILES="build.sh config"
+          for file in $REQUIRED_FILES; do
+            if [ ! -f "$file" ]; then
+              echo "❌ Missing: $file"
+              exit 1
+            fi
+          done
+          
+          # Check stages exist
+          REQUIRED_STAGES="stage0 stage1 stage2 stage-passivestack"
+          for stage in $REQUIRED_STAGES; do
+            if [ ! -d "$stage" ]; then
+              echo "❌ Missing stage: $stage"
+              exit 1
+            fi
+          done
+          
+          chmod +x build.sh
+          echo "✅ All files and stages present"
+
+      - name: Test Build (First Stage)
+        run: |
+          cd pi-gen
+          
+          echo "=== Test Build (Stage 0 only) ==="
+          
+          # Enable test mode
+          echo "TEST_MODE=1" >> config
+          
+          # Run in background to avoid timeout
+          timeout 30m ./build.sh 2>&1 | tee build.log &
+          BUILD_PID=$!
+          
+          # Wait and check
+          wait $BUILD_PID || true
+          
+          if grep -q "Stage 0 completed" build.log; then
+            echo "✅ Stage 0 completed successfully"
+          else
+            echo "❌ Stage 0 failed"
+            echo "Last 20 lines:"
+            tail -n 20 build.log
+            exit 1
           fi
-          
-          mkdir -p stage-passivestack
-          
-          # Erstelle das Skript für PassiveStack
-          cat > stage-passivestack/00-run.sh << 'EOF'
-#!/bin/bash
-set -e
 
-echo "PassiveStack installation stage"
+      - name: Upload Logs
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: build-test-logs
+          path: pi-gen/build.log
+          retention-days: 7
 
-# Installiere Docker
-curl -fsSL https://get.docker.com -o get-docker.sh
-sh get-docker.sh
-
-# Installiere Docker Compose
-curl -L "https://github.com/docker/compose/releases/latest/download/docker-compose- $ (uname -s)- $ (uname -m)" -o /usr/local/bin/docker-compose
-chmod +x /usr/local/bin/docker-compose
-
-# Erstelle Verzeichnis für PassiveStack
-mkdir -p /opt/passivestack
-
-# Setze Hostname
-echo "passivestack" > /etc/hostname
-hostnamectl set-hostname passivestack
-
-# Aktiviere SSH
-touch /boot/ssh
-
-# Konfiguriere Netzwerk
-cat >> /etc/dhcpcd.conf << 'NETCONFIG'
-interface eth0
-static ip_address=192.168.1.100/24
-static routers=192.168.1.1
-static domain_name_servers=8.8.8.8 8.8.4.4
-
-interface wlan0
-static ip_address=192.168.1.101/24
-static routers=192.168.1.1
-static domain_name_servers=8.8.8.8 
+      - name: Success Message
+        run: |
+          echo "========================================"
+          echo "✅ BUILD VALIDATION SUCCESSFUL"
+          echo "========================================"
+          echo ""
+          echo "Next: Remove TEST_MODE=1 and run full build"
+          echo "Full build will take 60-90 minutes"
