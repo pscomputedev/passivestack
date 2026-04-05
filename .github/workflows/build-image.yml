@@ -81,7 +81,8 @@ jobs:
             e2fsprogs \
             udev \
             initramfs-tools \
-            systemd-container
+            systemd-container \
+            debian-archive-keyring
           
           # QEMU Setup
           sudo rm -f /usr/local/bin/qemu-arm
@@ -96,7 +97,7 @@ jobs:
           repository: RPi-Distro/pi-gen
           path: pi-gen
           fetch-depth: 1
-          ref: bullseye  # WICHTIG: Benutze bullseye Branch statt master
+          ref: bullseye
 
       - name: 📁 Prüfe pi-gen Struktur
         run: |
@@ -121,7 +122,7 @@ jobs:
         run: |
           cd pi-gen
           
-          # Erstelle erweiterte Konfiguration für ARM64
+          # Erstelle einfache Konfiguration für ARM64
           cat > config << 'EOF'
 IMG_NAME=passivestack
 RELEASE=bullseye
@@ -137,14 +138,8 @@ IMG_ROOTSIZE=3500
 IMG_USERSIZE=1000
 BUILD_KERNEL=false
 COMPRESS_OUTPUTIMAGE=zip
-STAGE_LIST="stage0 stage1 stage2 stage3"
+STAGE_LIST="stage0 stage1 stage2"
 CLEAN=1
-# Raspberry Pi spezifische Einstellungen
-RPI_REPO_URI="http://archive.raspberrypi.org/debian/"
-RPI_REPO_KEYSERVER="keyserver.ubuntu.com"
-# Nur ARM64 (v8) bauen - NICHT v6/v7
-RPI_BOOT_FIRMWARE_VERSIONS="v8"
-# Deaktivere alle nicht-ARM64 Varianten
 SKIP_IMAGES=1
 EOF
           
@@ -253,25 +248,19 @@ EOF
           chmod +x stage3/*.sh
           echo "IMG_NAME=passivestack" > stage3/EXPORT_IMAGE
           
+          # Aktualisiere STAGE_LIST in config
+          echo 'STAGE_LIST="stage0 stage1 stage2 stage3"' >> config
+          
           echo "📁 Stage3 Inhalt:"
           ls -la stage3/
 
       - name: 🚀 Starte pi-gen Build
-        env:
-          DEBIAN_FRONTEND: noninteractive
         run: |
           cd pi-gen
           echo "🚀 Starte pi-gen Build..."
           echo "📋 Aktuelle Konfiguration:"
           cat config
           echo ""
-          
-          # Prüfe, ob stage0 korrekt konfiguriert ist
-          echo "🔍 Prüfe stage0 Konfiguration..."
-          if [ -f "stage0/00-configure-apt/files/sources.list" ]; then
-            echo "Stage0 sources.list:"
-            cat stage0/00-configure-apt/files/sources.list
-          fi
           
           # Baue Image
           echo "🛠️ Starte Build-Prozess..."
