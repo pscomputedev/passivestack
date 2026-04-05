@@ -2,14 +2,11 @@ name: PassiveStack Pi-Image Build
 
 on:
   workflow_dispatch:
-  push:
-    tags:
-      - 'v*'
 
 jobs:
   build:
     runs-on: ubuntu-latest
-    timeout-minutes: 360  # 6 Stunden Maximum
+    timeout-minutes: 360
     
     steps:
       - name: Checkout Repository
@@ -18,11 +15,7 @@ jobs:
       - name: Install Dependencies
         run: |
           sudo apt-get update
-          sudo apt-get install -y \
-            coreutils parted dosfstools \
-            qemu-user-static kpartx curl \
-            bc binfmt-support debootstrap \
-            zerofree git wget rsync
+          sudo apt-get install -y coreutils parted dosfstools qemu-user-static kpartx bc binfmt-support debootstrap zerofree git
 
       - name: Clone pi-gen
         run: |
@@ -30,93 +23,22 @@ jobs:
           cd pi-gen
           git checkout bullseye
 
-      - name: Create Minimal Config
+      - name: Create Config File
         run: |
           cd pi-gen
-          
-          # Erstelle eine SIMPLE config
-          cat > config << 'EOC'
-IMG_NAME=PassiveStack
-RELEASE=bullseye
-HOSTNAME=passivestack
-FIRST_USER_NAME=pi
-FIRST_USER_PASS=raspberry
-ENABLE_SSH=1
-STAGE_LIST="stage0 stage1 stage2"
-WORK_DIR="$PWD/work"
-DEPLOY_DIR="$PWD/deploy"
-CLEAN=1
-EOC
-          
-          echo "Config created:"
-          cat config
+          echo "IMG_NAME=PassiveStack" > config
+          echo "RELEASE=bullseye" >> config
+          echo "HOSTNAME=passivestack" >> config
+          echo "FIRST_USER_NAME=pi" >> config
+          echo "FIRST_USER_PASS=raspberry" >> config
+          echo "ENABLE_SSH=1" >> config
+          echo "STAGE_LIST=\"stage0 stage1 stage2\"" >> config
+          echo "WORK_DIR=\"$PWD/work\"" >> config
+          echo "DEPLOY_DIR=\"$PWD/deploy\"" >> config
+          echo "CLEAN=1" >> config
 
-      - name: Set Executable Permissions
+      - name: Run pi-gen Build
         run: |
           cd pi-gen
           chmod +x build.sh
-          ls -la build.sh
-
-      - name: Run Build
-        timeout-minutes: 300  # 5 Stunden für den Build
-        run: |
-          cd pi-gen
-          
-          echo "=========================================="
-          echo "STARTING PI-GEN BUILD (sudo required)"
-          echo "This will take 1-3 hours..."
-          echo "=========================================="
-          
-          # STARTE DEN BUILD MIT SUDO
-          sudo ./build.sh 2>&1 | tee build.log
-          
-          # Wenn wir hier ankommen, ist der Build fertig
-          echo "Build completed with exit code: $?"
-
-      - name: Check Build Result
-        run: |
-          cd pi-gen
-          
-          echo "=== Build Result Check ==="
-          
-          if [ -f "build.log" ]; then
-            echo "Build log size: $(wc -l < build.log) lines"
-            
-            if grep -q "Stage 2 completed" build.log; then
-              echo "✅ SUCCESS: All stages completed"
-            else
-              echo "❌ ERROR: Build may have failed"
-              echo "Last 30 lines of log:"
-              tail -n 30 build.log
-            fi
-          else
-            echo "❌ ERROR: No build.log found"
-          fi
-          
-          if [ -d "deploy" ]; then
-            echo "Images found in deploy/:"
-            ls -lh deploy/
-            echo ""
-            echo "Total image size:"
-            du -sh deploy/
-          else
-            echo "⚠️ No deploy directory"
-          fi
-
-      - name: Upload Build Logs
-        if: always()
-        uses: actions/upload-artifact@v4
-        with:
-          name: build-logs
-          path: |
-            pi-gen/build.log
-            pi-gen/config
-          retention-days: 7
-
-      - name: Upload Generated Images
-        if: success()
-        uses: actions/upload-artifact@v4
-        with:
-          name: raspberrypi-images
-          path: pi-gen/deploy/*
-          retention-days: 30
+          sudo ./build.sh
