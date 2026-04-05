@@ -12,10 +12,16 @@ jobs:
       - name: Checkout Repository
         uses: actions/checkout@v4
 
-      - name: Install Dependencies
+      - name: Install ALL Dependencies
         run: |
           sudo apt-get update
-          sudo apt-get install -y coreutils parted dosfstools qemu-user-static kpartx bc binfmt-support debootstrap zerofree git
+          sudo apt-get install -y \
+            coreutils parted dosfstools \
+            qemu-user-static kpartx \
+            bc binfmt-support debootstrap \
+            zerofree git wget rsync \
+            quilt libarchive-tools qemu-utils \
+            pigz zip
 
       - name: Clone pi-gen
         run: |
@@ -38,7 +44,9 @@ jobs:
           echo "CLEAN=1" >> config
 
       - name: Run pi-gen Build
+        timeout-minutes: 300
         run: |
           cd pi-gen
           chmod +x build.sh
+          echo "=== Starting pi-gen build ==="
           sudo ./build.sh
