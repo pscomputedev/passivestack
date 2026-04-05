@@ -45,7 +45,8 @@ jobs:
           sudo apt-get update -qq
           sudo apt-get install -y qemu-user-static coreutils parted dosfstools kpartx rsync \
             bc binfmt-support build-essential crossbuild-essential-arm64 curl ca-certificates \
-            git wget flex bison libssl-dev libncurses5-dev fakeroot debootstrap
+            git wget flex bison libssl-dev libncurses5-dev fakeroot debootstrap \
+            quilt libarchive-tools arch-test qemu-utils pigz zerofree zip
           sudo rm -f /usr/local/bin/qemu-arm
           sudo ln -sf /usr/bin/qemu-arm-static /usr/local/bin/qemu-arm
           sudo update-binfmts --enable qemu-arm
@@ -74,6 +75,7 @@ jobs:
           echo "IMG_USERSIZE=1000" >> pi-gen/config
           echo "BUILD_KERNEL=false" >> pi-gen/config
           echo "COMPRESS_OUTPUTIMAGE=zip" >> pi-gen/config
+          echo "STAGE_LIST=\"stage0 stage1 stage2 stage3\"" >> pi-gen/config
           cat pi-gen/config
 
       - name: 📂 Create Stage Files
@@ -174,11 +176,17 @@ jobs:
           DEBIAN_FRONTEND: noninteractive
         run: |
           cd pi-gen
+          echo "📋 Konfiguration:"
           cat config
+          echo ""
+          echo "📁 Stages vorhanden:"
           ls -la stage*
+          echo ""
+          echo "🚀 Starte Build mit Stages: stage0 stage1 stage2 stage3"
           sudo ./build.sh
           if [ $? -eq 0 ]; then
             echo "✅ Build erfolgreich!"
+            echo "📦 Erstellte Dateien:"
             ls -la deploy/
           else
             echo "❌ Build fehlgeschlagen!"
