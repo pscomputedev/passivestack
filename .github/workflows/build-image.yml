@@ -1,4 +1,4 @@
-name: PassiveStack Pi-Image Test
+name: PassiveStack Pi-Image Build
 
 on:
   workflow_dispatch:
@@ -7,55 +7,92 @@ on:
       - 'v*'
 
 jobs:
-  test-build:
+  build:
     runs-on: ubuntu-latest
+    timeout-minutes: 180
     
     steps:
       - name: Checkout Repository
         uses: actions/checkout@v4
 
-      - name: Install Basic Dependencies
+      - name: Install pi-gen Dependencies
         run: |
           sudo apt-get update
-          sudo apt-get install -y git curl wget
+          sudo apt-get install -y \
+            git \
+            curl \
+            wget \
+            ca-certificates \
+            qemu-user-static \
+            parted \
+            dosfstools \
+            kpartx \
+            rsync \
+            bc \
+            binfmt-support \
+            build-essential \
+            crossbuild-essential-arm64 \
+            libssl-dev \
+            libncurses5-dev \
+            fakeroot \
+            debootstrap \
+            quilt \
+            libarchive-tools \
+            coreutils \
+            zerofree \
+            zip \
+            jq
 
       - name: Clone pi-gen
         run: |
           git clone https://github.com/RPi-Distro/pi-gen.git
           cd pi-gen
           git checkout bullseye
-          ls -la
 
-      - name: Test pi-gen Structure
+      - name: Setup PassiveStack Stage Directory
         run: |
           cd pi-gen
-          echo "Checking files..."
-          if [ -f "./build.sh" ]; then
-            echo "build.sh exists"
-          else
-            echo "ERROR: build.sh missing"
-            exit 1
+          
+          # Erstelle stage3-Verzeichnis für PassiveStack
+          if [ -d "stage-passivestack" ]; then
+            rm -rf stage-passivestack
           fi
           
-          if [ -d "./stage0" ]; then
-            echo "stage0 directory exists"
-          else
-            echo "ERROR: stage0 missing"
-            exit 1
-          fi
+          mkdir -p stage-passivestack
+          
+          # Erstelle das Skript für PassiveStack
+          cat > stage-passivestack/00-run.sh << 'EOF'
+#!/bin/bash
+set -e
 
-      - name: Create Simple Config
-        run: |
-          cd pi-gen
-          echo "IMG_NAME=passivestack-test" > config
-          echo "RELEASE=bullseye" >> config
-          echo "HOSTNAME=passivestack" >> config
-          echo "STAGE_LIST=\"stage0 stage1 stage2\"" >> config
-          echo "Config created:"
-          cat config
+echo "PassiveStack installation stage"
 
-      - name: Dry Run Build
-        run: |
-          cd pi-gen
-          echo "This would run: sudo ./build.sh"
-          echo "Dry run completed successfully"
+# Installiere Docker
+curl -fsSL https://get.docker.com -o get-docker.sh
+sh get-docker.sh
+
+# Installiere Docker Compose
+curl -L "https://github.com/docker/compose/releases/latest/download/docker-compose- $ (uname -s)- $ (uname -m)" -o /usr/local/bin/docker-compose
+chmod +x /usr/local/bin/docker-compose
+
+# Erstelle Verzeichnis für PassiveStack
+mkdir -p /opt/passivestack
+
+# Setze Hostname
+echo "passivestack" > /etc/hostname
+hostnamectl set-hostname passivestack
+
+# Aktiviere SSH
+touch /boot/ssh
+
+# Konfiguriere Netzwerk
+cat >> /etc/dhcpcd.conf << 'NETCONFIG'
+interface eth0
+static ip_address=192.168.1.100/24
+static routers=192.168.1.1
+static domain_name_servers=8.8.8.8 8.8.4.4
+
+interface wlan0
+static ip_address=192.168.1.101/24
+static routers=192.168.1.1
+static domain_name_servers=8.8.8.8 
