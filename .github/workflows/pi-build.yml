@@ -48,7 +48,7 @@ jobs:
       - name: Populate stage files from repo source
         run: |
           FILES_DIR="pi-gen/stage-passivestack/00-passivestack/files"
-          mkdir -p "${FILES_DIR}/passivestack/config"
+          mkdir -p "${FILES_DIR}/passivestack"
           mkdir -p "${FILES_DIR}/passivestack/image"
           
           # Hauptdateien
@@ -56,12 +56,16 @@ jobs:
           cp passivestack/bootstrap.sh        "${FILES_DIR}/passivestack/"
           cp passivestack/generate-compose.py "${FILES_DIR}/passivestack/"
           
-          # Config-Dateien
-          cp passivestack/config/apps.json    "${FILES_DIR}/passivestack/config/"
+          # Die existierende config-Datei (nicht apps.json)
+          cp passivestack/config              "${FILES_DIR}/passivestack/config"
+          
+          # Image-Dateien
           cp passivestack/image/pi-gen-config "${FILES_DIR}/passivestack/image/"
           
           # Stage-Dateien
-          cp -r passivestack/image/stage-passivestack/* "${FILES_DIR}/passivestack/image/"
+          if [ -d "passivestack/image/stage-passivestack" ]; then
+            cp -r passivestack/image/stage-passivestack/* "${FILES_DIR}/passivestack/image/"
+          fi
           
       - name: Set EXPORT_IMAGE for custom stage
         run: |
