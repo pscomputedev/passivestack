@@ -60,7 +60,6 @@ jobs:
 
       - name: 📁 Setup pi-gen Konfiguration
         run: |
-          # Basiskonfiguration für pi-gen
           echo "IMG_NAME=passivestack" > pi-gen/config
           echo "RELEASE=bullseye" >> pi-gen/config
           echo "HOSTNAME=passivestack" >> pi-gen/config
@@ -71,28 +70,19 @@ jobs:
           echo "LOCALE_DEFAULT=de_DE.UTF-8" >> pi-gen/config
           echo "KEYBOARD_KEYMAP=de" >> pi-gen/config
           echo "KEYBOARD_LAYOUT=German" >> pi-gen/config
-          
-          # Größeres Image für Docker
           echo "IMG_ROOTSIZE=3500" >> pi-gen/config
           echo "IMG_USERSIZE=1000" >> pi-gen/config
-          
-          # Build-Optionen
           echo "BUILD_KERNEL=false" >> pi-gen/config
           echo "COMPRESS_OUTPUTIMAGE=zip" >> pi-gen/config
-          
-          echo "🔧 Konfiguration erstellt:"
           cat pi-gen/config
 
       - name: 📂 Kopiere PassiveStack Stage
         run: |
           set -euo pipefail
-          
-          # Stage3 Verzeichnis für PassiveStack vorbereiten
           STAGE_DIR="pi-gen/stage3"
           mkdir -p "${STAGE_DIR}"
           chmod -R 755 "${STAGE_DIR}"
           
-          # Basis-Skripte erstellen
           cat > "${STAGE_DIR}/00-run.sh" << 'EOF'
 #!/bin/bash -e
 echo "PassiveStack Stage 3 - Setup startet"
@@ -101,8 +91,6 @@ EOF
           cat > "${STAGE_DIR}/01-run.sh" << 'EOF'
 #!/bin/bash -e
 echo "PassiveStack Stage 3 - Docker Installation"
-
-# Docker installieren
 apt-get update
 apt-get install -y \
     apt-transport-https \
@@ -110,30 +98,19 @@ apt-get install -y \
     curl \
     gnupg \
     lsb-release
-
 curl -fsSL https://get.docker.com -o get-docker.sh
 sh get-docker.sh
-
-# Docker Gruppe hinzufügen
 usermod -aG docker ${FIRST_USER_NAME}
-
-# Docker Service aktivieren
 systemctl enable docker
 EOF
           
           cat > "${STAGE_DIR}/02-run.sh" << 'EOF'
 #!/bin/bash -e
 echo "PassiveStack Stage 3 - PassiveStack Setup"
-
-# PassiveCompute Repository klonen
 cd /home/${FIRST_USER_NAME}
 sudo -u ${FIRST_USER_NAME} git clone https://github.com/pinephosphore/passivestack.git
-
-# Installer ausführen
 cd passivestack
 chmod +x install.sh
-
-# First-Boot Flag setzen
 touch .firstboot_pending
 chown ${FIRST_USER_NAME}:${FIRST_USER_NAME} .firstboot_pending
 EOF
@@ -141,15 +118,12 @@ EOF
           cat > "${STAGE_DIR}/03-run.sh" << 'EOF'
 #!/bin/bash -e
 echo "PassiveStack Stage 3 - Systemd Service Setup"
-
-# First-Boot Service erstellen
 cat > /etc/systemd/system/passivestack-firstboot.service << 'SVC'
 [Unit]
 Description=PassiveStack First Boot Setup
 After=network-online.target docker.service
 Wants=network-online.target
 ConditionPathExists=/home/pi/passivestack/.firstboot_pending
-
 [Service]
 Type=oneshot
 ExecStart=/bin/bash /home/pi/passivestack/install.sh
@@ -159,32 +133,21 @@ User=pi
 Group=pi
 StandardOutput=journal+console
 StandardError=journal+console
-
 [Install]
 WantedBy=multi-user.target
 SVC
-
-# Service aktivieren
 systemctl enable passivestack-firstboot.service
 EOF
           
           cat > "${STAGE_DIR}/04-run.sh" << 'EOF'
 #!/bin/bash -e
 echo "PassiveStack Stage 3 - Optimierungen"
-
-# Swap deaktivieren für bessere SD-Karte Lebensdauer
 dphys-swapfile swapoff
 dphys-swapfile uninstall
 systemctl disable dphys-swapfile
-
-# SSH mit Key-only ermöglichen
 sed -i 's/#PasswordAuthentication yes/PasswordAuthentication yes/' /etc/ssh/sshd_config
 sed -i 's/#PubkeyAuthentication yes/PubkeyAuthentication yes/' /etc/ssh/sshd_config
-
-# Root Login verbieten
 sed -i 's/PermitRootLogin yes/PermitRootLogin no/' /etc/ssh/sshd_config
-
-# Docker Optimierungen
 cat >> /etc/docker/daemon.json << 'DOCK'
 {
   "log-driver": "json-file",
@@ -200,8 +163,6 @@ EOF
           cat > "${STAGE_DIR}/99-finish.sh" << 'EOF'
 #!/bin/bash -e
 echo "PassiveStack Stage 3 - Finalisierung"
-
-# Willkommensnachricht
 cat > /etc/motd << 'MOTD'
 #################################################
 #     PassiveStack Raspberry Pi Image           #
@@ -211,22 +172,14 @@ cat > /etc/motd << 'MOTD'
 #     Bitte warten Sie bis zum ersten Boot.     #
 #################################################
 MOTD
-
-# SSH Banner
 cat > /etc/issue.net << 'BANNER'
 PassiveStack Image - https://passivecompute.de
 BANNER
-
 echo "PassiveStack Image Build abgeschlossen"
 EOF
           
-          # Alle Skripte ausführbar machen
           chmod +x "${STAGE_DIR}"/*.sh
-          
-          # EXPORT_IMAGE deaktivieren in stage3
           touch "${STAGE_DIR}/EXPORT_IMAGE"
-          
-          echo "✅ Stage3 erfolgreich erstellt:"
           ls -la "${STAGE_DIR}/"
 
       - name: 🛠️ Run pi-gen Build
@@ -234,19 +187,9 @@ EOF
           DEBIAN_FRONTEND: noninteractive
         run: |
           cd pi-gen
-          
-          # Prüfe Konfiguration
-          echo "🔧 Aktuelle Konfiguration:"
           cat config
-          
-          echo "🔧 Verfügbare Stages:"
           ls -la stage*
-          
-          # Build starten
-          echo "🚀 pi-gen Build starten (kann 30-60 Minuten dauern)..."
           sudo ./build.sh
-          
-          # Build-Status prüfen
           if [ $? -eq 0 ]; then
             echo "✅ Build erfolgreich!"
             ls -la deploy/
@@ -280,10 +223,9 @@ EOF
       - name: 🧹 Aufräumen
         if: always()
         run: |
-          echo "🧹 Aufräumen..."
           sudo rm -rf pi-gen/work/
           sudo rm -rf pi-gen/deploy/
-          
+
       - name: ✅ Build erfolgreich
         if: success()
         run: |
