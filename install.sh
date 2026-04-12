@@ -79,10 +79,10 @@ prompt() {
   fi
 
   if [[ "${secret}" == "true" ]]; then
-    read -rsp "$(echo -e "${BOLD}${ARROW}${NC} ${prompt_text}: ")" value
+    read -rsp "$(echo -e "${BOLD}${ARROW}${NC} ${prompt_text}: ")" value </dev/tty
     echo ""
   else
-    read -rp "$(echo -e "${BOLD}${ARROW}${NC} ${prompt_text}: ")" value
+    read -rp "$(echo -e "${BOLD}${ARROW}${NC} ${prompt_text}: ")" value </dev/tty
   fi
 
   value="${value:-${default}}"
@@ -99,7 +99,6 @@ check_requirements() {
   log "Prüfe Voraussetzungen..."
   local missing=()
 
-  # Docker
   if command -v docker &>/dev/null; then
     local docker_ver
     docker_ver=$(docker --version | grep -oP '\d+\.\d+')
@@ -109,7 +108,6 @@ check_requirements() {
     missing+=("docker")
   fi
 
-  # Docker Compose
   if docker compose version &>/dev/null 2>&1; then
     ok "Docker Compose Plugin verfügbar"
   elif command -v docker-compose &>/dev/null; then
@@ -119,7 +117,6 @@ check_requirements() {
     missing+=("docker-compose")
   fi
 
-  # Python3 (für generate-compose.py)
   if command -v python3 &>/dev/null; then
     ok "Python3 verfügbar"
   else
@@ -127,7 +124,6 @@ check_requirements() {
     missing+=("python3")
   fi
 
-  # PyYAML
   if python3 -c "import yaml" &>/dev/null 2>&1; then
     ok "PyYAML verfügbar"
   else
@@ -137,14 +133,12 @@ check_requirements() {
     { err "PyYAML konnte nicht installiert werden"; missing+=("pyyaml"); }
   fi
 
-  # jq (optional, für JSON-Verarbeitung)
   if command -v jq &>/dev/null; then
     ok "jq verfügbar"
   else
     warn "jq nicht gefunden (optional) — sudo apt install jq"
   fi
 
-  # Architektur erkennen
   ARCH=$(uname -m)
   case "${ARCH}" in
     x86_64|amd64) DOCKER_ARCH="amd64" ;;
@@ -170,11 +164,9 @@ setup_device() {
 
   local hostname_default
   hostname_default=$(hostname 2>/dev/null || echo "my-device")
-  # Leerzeichen und Sonderzeichen entfernen
   hostname_default=$(echo "${hostname_default}" | tr '[:upper:]' '[:lower:]' | sed 's/[^a-z0-9-]/-/g')
 
   prompt DEVICE_NAME "Gerätename (wird als Container-Prefix verwendet)" "${hostname_default}"
-  # Validierung: nur alphanumerisch + Bindestriche
   DEVICE_NAME=$(echo "${DEVICE_NAME}" | tr '[:upper:]' '[:lower:]' | sed 's/[^a-z0-9-]/-/g')
   ok "Gerätename: ${DEVICE_NAME}"
 }
@@ -188,11 +180,9 @@ setup_apps() {
   info "Nicht konfigurierte Apps werden deaktiviert."
   echo ""
 
-  # Initialisiere Apps-Array für user-config
   declare -gA APP_ENABLED
   declare -gA APP_CONFIG
 
-  # Apps aus apps.json lesen
   local apps_names
   apps_names=$(python3 -c "
 import json
@@ -206,7 +196,6 @@ for app in d['apps']:
     echo ""
     echo -e "${BOLD}── ${label} ──${NC}"
 
-    # Referral-Link anzeigen
     local ref_url
     ref_url=$(python3 -c "
 import json
@@ -234,11 +223,9 @@ configure_app() {
   local name="$1"
   local label="$2"
   local auth_type="$3"
-  local cfg=""
 
   case "${auth_type}" in
     uuid)
-      # UUID automatisch generieren
       local uuid
       uuid=$(python3 -c "import uuid; print(uuid.uuid4().hex)")
       APP_CONFIG["${name}_uuid"]="${uuid}"
@@ -303,7 +290,6 @@ apps_json = json.load(open('${APPS_JSON}'))
 enabled   = {}
 configs   = {}
 
-# Shell-Arrays einlesen
 enabled_raw = """$(for k in "${!APP_ENABLED[@]}"; do echo "${k}=${APP_ENABLED[$k]}"; done)"""
 config_raw  = """$(for k in "${!APP_CONFIG[@]}"; do echo "${k}=${APP_CONFIG[$k]}"; done)"""
 
@@ -387,7 +373,6 @@ lines = [
     '',
 ]
 
-# Netzwerk
 net = apps_json['system']['network']
 lines += [
     f"NETWORK_DRIVER={net['driver']}",
@@ -396,7 +381,6 @@ lines += [
     '',
 ]
 
-# Watchtower
 wt = apps_json['system']['watchtower']
 lines += [
     f"M4B_WATCHTOWER_SCOPE={wt['scope']}",
@@ -405,13 +389,11 @@ lines += [
     '',
 ]
 
-# Dashboard Port
 lines += [
     'M4B_DASHBOARD_PORT=8081',
     '',
 ]
 
-# Resource Limits
 res = apps_json['system']['resource_limits']
 lines += [
     f"APP_CPU_LIMIT_LITTLE={res['little']['cpus']}",
@@ -426,7 +408,6 @@ lines += [
     '',
 ]
 
-# App-Credentials
 for app in apps_json['apps']:
     name = app['name']
     auth = app['auth_type']
@@ -458,7 +439,6 @@ for app in apps_json['apps']:
 
     lines.append('')
 
-# Mysterium Port
 lines.append('MYSTNODE_PORT=4449')
 
 with open('${ENV_FILE}', 'w') as f:
@@ -467,7 +447,6 @@ with open('${ENV_FILE}', 'w') as f:
 print(f'.env geschrieben ({len(lines)} Zeilen)')
 PYEOF
 
-  # .env absichern — nur Owner darf lesen (Credentials drin!)
   chmod 600 "${ENV_FILE}"
   ok ".env erstellt (chmod 600)"
 }
@@ -534,7 +513,6 @@ print_summary() {
   echo -e "  ${CYAN}Neustart:${NC}   docker compose -p passivestack restart"
   echo ""
 
-  # EarnApp Claim-Link anzeigen falls konfiguriert
   if [[ "${APP_ENABLED[earnapp]:-false}" == "true" ]]; then
     local uuid="${APP_CONFIG[earnapp_uuid]:-}"
     if [[ -n "${uuid}" ]]; then
@@ -555,29 +533,17 @@ main() {
   log "Log-Datei: ${LOG_FILE}"
   echo ""
 
-  # Voraussetzungen
   check_requirements
-
-  # Gerät konfigurieren
   setup_device
-
-  # Apps konfigurieren
   setup_apps
-
-  # Dateien schreiben
   write_user_config
   write_env_file
   generate_compose
   create_data_dirs
-
-  # Starten
   start_stack
-
-  # Zusammenfassung
   print_summary
 }
 
-# Nur ausführen wenn direkt aufgerufen, nicht wenn gesourced
 if [[ "${BASH_SOURCE[0]}" == "${0}" ]]; then
   main "$@"
 fi
