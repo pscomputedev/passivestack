@@ -13,76 +13,65 @@ jobs:
         uses: actions/checkout@v4
         with:
           path: passivestack
-          
+
       - name: Install qemu-user-static
         run: |
           sudo apt-get update
           sudo apt-get install -y qemu-user-static
           sudo ln -s /usr/bin/qemu-arm-static /usr/local/bin/qemu-arm
-          
+
       - name: Clone pi-gen (bookworm branch)
         run: git clone --depth 1 --branch bookworm https://github.com/RPi-Distro/pi-gen.git pi-gen
-        
+
       - name: Configure pi-gen
         working-directory: pi-gen
         run: |
-          # Basis-Config aus Repo
           cp ../passivestack/image/pi-gen-config config
-          # Explizite Einstellungen für normales Image
-          echo "NOOBS=0" >> config
-          echo "DEPLOY_ZIP=1" >> config
-          echo "DEPLOY_COMPRESSED=1" >> config
-          # Wichtig: Lass stage-passivestack rootfs von stage2 erben
-          echo "STAGE_LIST=\"stage0 stage1 stage2\"" >> config
-          
+          echo 'DEPLOY_ZIP=1' >> config
+          echo 'STAGE_LIST="stage0 stage1 stage2 stage3"' >> config
+
       - name: Patch sshd_config for password login
         working-directory: pi-gen
         run: |
           cat >> stage2/01-sys-tweaks/01-run.sh << 'EOF'
-          # PassiveStack: Passwort-Login für SSH aktivieren
           sed -i 's/^#\?[[:blank:]]*PasswordAuthentication.*/PasswordAuthentication yes/' "${ROOTFS_DIR}/etc/ssh/sshd_config"
           echo "PasswordAuthentication yes" >> "${ROOTFS_DIR}/etc/ssh/sshd_config"
           EOF
-          
-      - name: Copy stage-passivestack as stage3 (ersetzt die originale stage3)
+
+      - name: Copy stage-passivestack as stage3
         run: |
-          # Lösche die originale stage3
           rm -rf pi-gen/stage3
-          # Kopiere unsere stage-passivestack als stage3
           cp -r passivestack/image/stage-passivestack pi-gen/stage3
-          
-      - name: Populate stage files from repo source
+
+      - name: Populate stage files
         run: |
           FILES_DIR="pi-gen/stage3/00-passivestack/files"
-          mkdir -p "${FILES_DIR}/passivestack"
+          mkdir -p "${FILES_DIR}/passivestack/config"
           mkdir -p "${FILES_DIR}/passivestack/image"
-          
-          # Hauptdateien
-          cp passivestack/install.sh          "${FILES_DIR}/passivestack/"
-          cp passivestack/bootstrap.sh        "${FILES_DIR}/passivestack/"
-          cp passivestack/generate-compose.py "${FILES_DIR}/passivestack/"
-          
-          # Die existierende config-Datei
-          cp passivestack/config              "${FILES_DIR}/passivestack/config"
-          
-          # Image-Dateien
-          cp passivestack/image/pi-gen-config "${FILES_DIR}/passivestack/image/"
-          
-          # Stage-Dateien
-          if [ -d "passivestack/image/stage-passivestack" ]; then
-            cp -r passivestack/image/stage-passivestack/* "${FILES_DIR}/passivestack/image/"
-          fi
-          
+
+          cp passivestack/install.sh           "${FILES_DIR}/passivestack/"
+          cp passivestack/bootstrap.sh         "${FILES_DIR}/passivestack/"
+          cp passivestack/generate-compose.py  "${FILES_DIR}/passivestack/"
+          cp passivestack/status-updater.sh    "${FILES_DIR}/passivestack/"
+          cp passivestack/config/apps.json     "${FILES_DIR}/passivestack/config/"
+          cp passivestack/image/firstboot.sh                    "${FILES_DIR}/passivestack/image/"
+          cp passivestack/image/passivestack-firstboot.service  "${FILES_DIR}/"
+
+          echo "=== Files staged ==="
+          find "${FILES_DIR}" -type f | sort
+
+      - name: Fix permissions
+        run: chmod +x pi-gen/stage3/00-passivestack/prerun.sh
+
       - name: Set EXPORT_IMAGE for stage3
-        run: |
-          touch pi-gen/stage3/EXPORT_IMAGE
-          
+        run: touch pi-gen/stage3/EXPORT_IMAGE
+
       - name: Build image via Docker
         working-directory: pi-gen
         env:
           PIGEN_DOCKER_OPTS: "-v /usr/bin/qemu-arm-static:/usr/bin/qemu-arm-static"
         run: ./build-docker.sh
-        
+
       - name: Upload image artifact
         uses: actions/upload-artifact@v4
         with:
