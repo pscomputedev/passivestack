@@ -16,72 +16,38 @@ jobs:
     steps:
       - name: Checkout Repository
         uses: actions/checkout@v4
-        with:
-          submodules: false
-
-      - name: Debug - Show Repository Structure
-        run: |
-          echo "=== ROOT DIRECTORY ==="
-          ls -la
-          echo ""
-          echo "=== FIND stage-passivestack ==="
-          find . -type d -name "stage-passivestack" 2>/dev/null
-          echo ""
-          echo "=== CHECK passivestack/ IF EXISTS ==="
-          if [ -d "passivestack" ]; then
-            ls -la passivestack/
-            if [ -d "passivestack/image" ]; then
-              ls -la passivestack/image/
-            fi
-          fi
-          echo ""
-          echo "=== CHECK image/ IF EXISTS ==="
-          if [ -d "image" ]; then
-            ls -la image/
-          fi
 
       - name: Clone pi-gen Repository
         run: |
           rm -rf pi-gen
           git clone --depth=1 https://github.com/RPi-Distro/pi-gen.git
-          ls -la pi-gen/
 
-      - name: Copy Custom Stages and Create Config
+      - name: Setup Custom Stage and Fix Paths
         run: |
-          echo "=== Locating stage-passivestack ==="
-          STAGE_SRC=""
+          # WICHTIG: Symlink erstellen, damit Pfade wie "passivestack/config/" funktionieren
+          ln -sf . passivestack
           
-          if [ -d "stage-passivestack" ]; then
-            STAGE_SRC="stage-passivestack"
-            echo "Found in root: $STAGE_SRC"
-          elif [ -d "passivestack/image/stage-passivestack" ]; then
-            STAGE_SRC="passivestack/image/stage-passivestack"
-            echo "Found in passivestack/image: $STAGE_SRC"
-          elif [ -d "image/stage-passivestack" ]; then
-            STAGE_SRC="image/stage-passivestack"
-            echo "Found in image: $STAGE_SRC"
+          echo "=== Verifying structure ==="
+          ls -la config/
+          ls -la image/
+          
+          # Stage kopieren (aus image/ Verzeichnis)
+          if [ -d "image/stage-passivestack" ]; then
+            cp -r image/stage-passivestack pi-gen/stage-passivestack
+            echo "Copied from image/stage-passivestack"
           else
-            STAGE_SRC=$(find . -type d -name "stage-passivestack" | head -1)
-            if [ -n "$STAGE_SRC" ]; then
-              echo "Found via search: $STAGE_SRC"
-            else
-              echo "ERROR: stage-passivestack not found in any location!"
-              exit 1
-            fi
+            echo "ERROR: image/stage-passivestack not found!"
+            exit 1
           fi
           
-          echo "=== Copying from $STAGE_SRC to pi-gen/ ==="
-          cp -r "$STAGE_SRC" pi-gen/stage-passivestack
+          # Ausführbar machen
+          chmod +x pi-gen/stage-passivestack/*.sh 2>/dev/null || true
           
-          echo "=== Verifying stage in pi-gen ==="
+          echo "=== Stage content ==="
           ls -la pi-gen/stage-passivestack/
-          
-          if [ -f "pi-gen/stage-passivestack/00-run.sh" ]; then
-            echo "00-run.sh exists and is executable:"
-            cat pi-gen/stage-passivestack/00-run.sh
-          fi
-          
-          echo "=== Creating pi-gen config ==="
+
+      - name: Create pi-gen Config
+        run: |
           cat > pi-gen/config << 'EOF'
           IMG_NAME=PassiveStack
           RELEASE=bullseye
@@ -92,43 +58,21 @@ jobs:
           ENABLE_SSH=1
           STAGE_LIST=stage0 stage1 stage2 stage-passivestack
           EOF
-          
-          echo "=== Config content ==="
-          cat pi-gen/config
 
       - name: Install Build Dependencies
         run: |
           sudo apt-get update
           sudo apt-get install -y \
-            coreutils \
-            quilt \
-            parted \
-            qemu-user-static \
-            debootstrap \
-            zerofree \
-            zip \
-            dosfstools \
-            libarchive-tools \
-            libcap2-bin \
-            grep \
-            rsync \
-            xz-utils \
-            file \
-            git \
-            curl \
-            bc \
-            qemu-utils \
-            kpartx \
-            binfmt-support \
-            pigz
+            coreutils quilt parted qemu-user-static debootstrap zerofree zip \
+            dosfstools libarchive-tools libcap2-bin grep rsync xz-utils file \
+            git curl bc qemu-utils kpartx binfmt-support pigz
 
-      - name: Build Raspberry Pi Image
+      - name: Build Image
         run: |
           cd pi-gen
-          echo "=== Starting build ==="
           sudo CLEAN=1 ./build.sh
-          
-      - name: Upload Build Artifacts
+
+      - name: Upload Artifacts
         if: success()
         uses: actions/upload-artifact@v4
         with:
