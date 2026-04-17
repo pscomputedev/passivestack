@@ -1,91 +1,90 @@
-name: Build Raspberry Pi Image
+name: 🛠️ Pi-Gen Build FIXED
 
 on:
   workflow_dispatch:
-    inputs:
-      version:
-        description: 'Image Version'
-        required: true
-        default: 'v1.3'
 
 jobs:
   build:
-    runs-on: ubuntu-latest
-    timeout-minutes: 120
+    runs-on: ubuntu-22.04
+    timeout-minutes: 240
 
     steps:
+      # 1. CHECKOUT OHNE SUBMODULES
       - name: 📥 Checkout Repository
         uses: actions/checkout@v4
         with:
-          submodules: recursive
+          submodules: false  # WICHTIG: Keine Submodules
 
-      - name: 🛠️ Fix pi-gen Source
+      # 2. PI-GEN MANUELL KLONEN
+      - name: 🐧 Clone pi-gen
         run: |
-          echo "=== REPLACE BAD SUBMODULE ==="
-          
-          # Lösche das nicht-existente Submodule
-          rm -rf pi-gen
-          
-          # Klone das KORREKTE Repository
-          git clone https://github.com/RPi-Distro/pi-gen.git
+          echo "=== KLONE PI-GEN VON RPI-DISTRO ==="
+          rm -rf pi-gen  # Falls existiert
+          git clone --depth=1 https://github.com/RPi-Distro/pi-gen.git
           cd pi-gen
-          git checkout 2022-01-01-raspios-bullseye  # STABILER TAG
-          
-          echo "pi-gen ready at $(pwd)"
+          git checkout 2022-01-01-raspios-bullseye
+          echo "pi-gen Version: $(git describe --tags)"
 
-      - name: 🔧 Configure Build
+      # 3. STAGES KOPIEREN
+      - name: 📂 Copy Stages
         run: |
-          echo "=== CREATE CONFIG ==="
-          cd pi-gen
+          echo "=== KOPIERE STAGES ==="
           
-          # Einfache Config - GENAU WIE IM ORIGINAL
-          echo "IMG_NAME=PassiveStack" > config
-          echo "RELEASE=bullseye" >> config
-          echo "DEPLOY_ZIP=1" >> config
-          echo "DEPLOY_DIR=../deploy" >> config
-          echo "ENABLE_SSH=1" >> config
+          # Deine Stage kopieren
+          cp -r stage-passivestack pi-gen/
           
-          echo "Config created:"
-          cat config
+          # Config erstellen
+          cat > pi-gen/config << 'EOF'
+          IMG_NAME=PassiveStack
+          RELEASE=bullseye
+          DEPLOY_ZIP=1
+          DEPLOY_DIR=../deploy
+          HOSTNAME=passivestack
+          FIRST_USER_PASS=raspberry
+          ENABLE_SSH=1
+          STAGE_LIST="stage0 stage1 stage2 stage-passivestack"
+          EOF
+          
+          echo "Config:"
+          cat pi-gen/config
 
+      # 4. DEPENDENCIES INSTALLIEREN
       - name: 📦 Install Dependencies
         run: |
-          echo "=== INSTALL DEPS ==="
+          echo "=== INSTALLIERE ABHÄNGIGKEITEN ==="
           sudo apt-get update
           sudo apt-get install -y \
             coreutils quilt parted qemu-user-static debootstrap \
             zerofree zip dosfstools libarchive-tools libcap2-bin \
-            grep rsync xz-utils file git curl bc qemu-utils kpartx pigz \
-            binfmt-support
+            grep rsync xz-utils file git curl bc qemu-utils kpartx \
+            binfmt-support pigz
 
-      - name: 🏗️ Run Build
+      # 5. BUILD STARTEN
+      - name: 🏗️ Build Image
         run: |
-          echo "=== START BUILD ==="
+          echo "=== STARTE BUILD ==="
           cd pi-gen
           
-          # BAUE NUR STAGE 0 ZUM TESTEN
-          echo "Running stage0 test..."
-          sudo ./build.sh -c config 2>&1 | tee build-stage0.log
+          # Erst Stage 0 testen
+          echo "Teste Stage 0..."
+          sudo ./build-docker.sh -c config --stage 0 2>&1 | tee build-stage0.log
           
-          # Wenn stage0 erfolgreich, baue komplett
           if [ ${PIPESTATUS[0]} -eq 0 ]; then
-            echo "Stage0 successful, building full image..."
-            sudo CLEAN=1 ./build.sh 2>&1 | tee build-full.log
+            echo "Stage 0 erfolgreich, starte kompletten Build..."
+            sudo CLEAN=1 ./build-docker.sh 2>&1 | tee build-full.log
           else
-            echo "Stage0 failed, check logs"
-            tail -50 build-stage0.log
+            echo "Stage 0 fehlgeschlagen"
+            tail -100 build-stage0.log
             exit 1
           fi
 
-      - name: 📤 Upload Artifacts
+      # 6. ARTIFACTS UPLOADEN
+      - name: 📤 Upload Image
         if: success()
         uses: actions/upload-artifact@v4
         with:
-          name: raspberry-pi-image
-          path: |
-            pi-gen/deploy/*.img
-            pi-gen/deploy/*.zip
-            pi-gen/deploy/*.xz
+          name: passivestack-image
+          path: pi-gen/deploy/*.img
           retention-days: 7
 
       - name: 📄 Upload Logs
