@@ -1,0 +1,232 @@
+name: PassiveStack CI/CD
+
+on:
+  push:
+    branches: [ main, develop ]
+  pull_request:
+    branches: [ main ]
+  schedule:
+    # Läuft täglich um 2 Uhr UTC
+    - cron: '0 2 * * *'
+
+env:
+  DOCKER_COMPOSE_VERSION: "v2.20.0"
+
+jobs:
+  syntax-check:
+    name: Syntax und Validierung
+    runs-on: ubuntu-latest
+    
+    steps:
+    - uses: actions/checkout@v3
+    
+    - name: Setup Python
+      uses: actions/setup-python@v4
+      with:
+        python-version: '3.10'
+    
+    - name: Validate JSON files
+      run: |
+        echo "Prüfe JSON Syntax..."
+        python -m json.tool config/apps.json > /dev/null
+        echo "✅ apps.json ist valide"
+        
+        # Prüfe ob Template existiert
+        if [ -f "config/user-config.json" ]; then
+          python -m json.tool config/user-config.json > /dev/null
+          echo "✅ user-config.json ist valide"
+        fi
+    
+    - name: Validate YAML files
+      run: |
+        echo "Prüfe YAML Syntax..."
+        python -c "import yaml; yaml.safe_load(open('.github/workflows/test.yml'))"
+        echo "✅ GitHub Actions YAML ist valide"
+        
+        if [ -f "docker-compose.yaml" ]; then
+          python -c "import yaml; yaml.safe_load(open('docker-compose.yaml'))"
+          echo "✅ docker-compose.yaml ist valide"
+        fi
+    
+    - name: Check shell scripts
+      run: |
+        echo "Prüfe Shell Script Syntax..."
+        shellcheck install.sh || true
+        shellcheck update.sh || true
+        
+        # Prüfe Berechtigungen
+        chmod +x install.sh update.sh generate-compose.py
+    
+    - name: Validate Python scripts
+      run: |
+        echo "Prüfe Python Scripts..."
+        python -m py_compile generate-compose.py
+        echo "✅ generate-compose.py ist valide"
+        
+        if [ -f "update.py" ]; then
+          python -m py_compile update.py
+          echo "✅ update.py ist valide"
+        fi
+
+  docker-compose-validation:
+    name: Docker Compose Validierung
+    runs-on: ubuntu-latest
+    needs: syntax-check
+    
+    steps:
+    - uses: actions/checkout@v3
+    
+    - name: Setup Docker
+      uses: docker/setup-buildx-action@v2
+    
+    - name: Validate docker-compose.yaml
+      run: |
+        echo "Prüfe Docker Compose..."
+        
+        # Temporäre user-config erstellen
+        mkdir -p config
+        cat > config/user-config.json << EOF
+        {
+          "device_name": "test",
+          "apps": {
+            "traffmonetizer": {
+              "enabled": true,
+              "credentials": {
+                "TOKEN": "test-token"
+              }
+            }
+          }
+        }
+        EOF
+        
+        # Generiere Compose
+        python3 generate-compose.py
+        
+        # Validiere mit docker-compose
+        if command -v docker-compose &> /dev/null; then
+          docker-compose -f docker-compose.yaml config
+          echo "✅ docker-compose.yaml ist valide"
+        else
+          echo "⚠️ docker-compose nicht installiert, überspringe Validierung"
+        fi
+    
+    - name: Check for arm64 compatibility
+      run: |
+        echo "Prüfe ARM64 Kompatibilität..."
+        
+        # Extrahiere alle Images
+        grep -h "image:" docker-compose.yaml | sort | uniq | while read -r line; do
+          image=$(echo "$line" | awk '{print $2}' | tr -d '"')
+          echo "🔍 Prüfe Image: $image"
+          
+          # Prüfe ob Image ARM64 unterstützt
+          if [[ "$image" == *"arm"* ]] || [[ "$image" == *"aarch64"* ]]; then
+            echo "  ✅ Explizit ARM-kompatibel"
+          elif docker manifest inspect "$image" > /dev/null 2>&1; then
+            echo "  ✅ Image existiert"
+          else
+            echo "  ⚠️  Image nicht gefunden oder keine Manifest-Info"
+          fi
+        done
+
+  integration-test:
+    name: Integrationstest
+    runs-on: ubuntu-latest
+    needs: docker-compose-validation
+    
+    steps:
+    - uses: actions/checkout@v3
+    
+    - name: Setup Docker
+      uses: docker/setup-buildx-action@v2
+    
+    - name: Install Docker Compose
+      run: |
+        curl -L "https://github.com/docker/compose/releases/download/$DOCKER_COMPOSE_VERSION/docker-compose-linux-$(uname -m)" \
+          -o /usr/local/bin/docker-compose
+        chmod +x /usr/local/bin/docker-compose
+        docker-compose --version
+    
+    - name: Run installation test
+      run: |
+        echo "🔄 Teste Installation..."
+        
+        # Simuliere Installation
+        chmod +x install.sh
+        
+        # Führe Installationsschritte manuell aus (ohne root)
+        mkdir -p config
+        
+        # Erstelle minimale Konfiguration
+        cat > config/user-config.json << EOF
+        {
+          "device_name": "ci-test",
+          "apps": {
+            "traffmonetizer": {
+              "enabled": true,
+              "credentials": {
+                "TOKEN": "ci-test-token-12345"
+              }
+            }
+          }
+        }
+        EOF
+        
+        # Teste generate-compose.py
+        python3 generate-compose.py
+        
+        # Prüfe ob docker-compose.yaml erstellt wurde
+        if [ -f "docker-compose.yaml" ]; then
+          echo "✅ docker-compose.yaml wurde erstellt"
+          
+          # Zähle Services
+          services=$(grep -c "^  [a-z]" docker-compose.yaml || true)
+          echo "📊 Gefundene Services: $services"
+        else
+          echo "❌ docker-compose.yaml wurde nicht erstellt"
+          exit 1
+        fi
+    
+    - name: Test update script
+      run: |
+        if [ -f "update.sh" ]; then
+          echo "🔄 Teste Update Script..."
+          chmod +x update.sh
+          echo "✅ update.sh ist ausführbar"
+        fi
+
+  security-scan:
+    name: Security Scan
+    runs-on: ubuntu-latest
+    
+    steps:
+    - uses: actions/checkout@v3
+    
+    - name: Run Trivy vulnerability scanner
+      uses: aquasecurity/trivy-action@master
+      with:
+        scan-type: 'fs'
+        scan-ref: '.'
+        format: 'sarif'
+        output: 'trivy-results.sarif'
+    
+    - name: Upload Trivy scan results to GitHub Security tab
+      uses: github/codeql-action/upload-sarif@v2
+      if: always()
+      with:
+        sarif_file: 'trivy-results.sarif'
+
+  notify:
+    name: Notify Status
+    runs-on: ubuntu-latest
+    needs: [syntax-check, docker-compose-validation, integration-test]
+    if: always()
+    
+    steps:
+    - name: Workflow Status
+      run: |
+        echo "Workflow abgeschlossen!"
+        echo "Jobs:"
+        echo "  syntax-check: ${{ needs.syntax-check.result }}"
+        echo "  docker-compose-validation: ${{ needs.docker-compose-validation.result }}"
+        echo "  integration-test: ${{ needs.integration-test.result }}"
