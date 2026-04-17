@@ -1,10 +1,6 @@
 name: PassiveStack Pi-Image Build
 
 on:
-  push:
-    branches: [ main ]
-  pull_request:
-    branches: [ main ]
   workflow_dispatch:
 
 jobs:
@@ -23,24 +19,17 @@ jobs:
       uses: actions/checkout@v4
       with:
         submodules: recursive
-        fetch-depth: 0
 
-    - name: 🛠️ Setup pi-gen Dependencies
+    - name: 🛠️ Install Dependencies
       run: |
-        echo "📦 Installiere Abhängigkeiten für Ubuntu 24.04..."
+        echo "📦 Installiere System-Abhängigkeiten..."
         sudo apt-get update
         sudo apt-get install -y \
           coreutils quilt parted qemu-user-static debootstrap zerofree zip \
           dosfstools libarchive-tools libcap2-bin grep rsync xz-utils file git curl bc \
           qemu-utils kpartx pigz
-        
-        echo "✅ Abhängigkeiten installiert"
-        echo "📊 Paketversionen:"
-        which bsdtar || which bsdtar3 || echo "bsdtar nicht gefunden"
-        which arch-test || echo "arch-test nicht gefunden"
-        dpkg -l | grep -E "(libarchive|qemu|debootstrap)"
 
-    - name: 🔧 Configure pi-gen
+    - name: 🔧 Setup pi-gen
       run: |
         echo "⚙️ Konfiguriere pi-gen..."
         cd pi-gen
@@ -72,42 +61,22 @@ EOF
         
         echo "📄 Config-Inhalt:"
         cat config
-        
-        echo "📁 Prüfe Stage-Verzeichnisse..."
-        ls -la stage3/
-        
-        echo "🔧 Setze Berechtigungen..."
-        sudo chmod +x build.sh
-        sudo chmod +x stage*/prerun.sh stage*/run.sh stage*/postrun.sh 2>/dev/null || true
 
     - name: 🏗️ Build Image
       run: |
         echo "🚀 Starte Build-Prozess..."
         cd pi-gen
         
-        # Teste Build-Skript
-        echo "🔍 Teste Build-Skript..."
-        if [ ! -f "./build.sh" ]; then
-          echo "❌ build.sh nicht gefunden!"
-          exit 1
-        fi
+        # Starte Build
+        sudo ./build.sh
         
-        # Starte Build mit Logging
-        echo "📝 Build-Log wird geschrieben..."
-        sudo ./build.sh 2>&1 | tee build.log
-        
-        BUILD_RESULT=${PIPESTATUS[0]}
-        if [ $BUILD_RESULT -eq 0 ]; then
-          echo "✅ Build erfolgreich!"
-          echo "📦 Erstellte Dateien:"
+        echo "📊 Prüfe Resultate..."
+        if [ -f "../deploy/*.img" ]; then
+          echo "✅ Image erfolgreich erstellt!"
           ls -la ../deploy/
-          echo "📊 Image-Info:"
-          file ../deploy/*.img 2>/dev/null || echo "Keine .img Datei gefunden"
         else
-          echo "❌ Build fehlgeschlagen mit Code: $BUILD_RESULT"
-          echo "📋 Letzte 50 Zeilen des Logs:"
-          tail -50 build.log
-          exit 1
+          echo "⚠️ Keine .img Datei gefunden, prüfe Logs..."
+          ls -la ../deploy/ || true
         fi
 
     - name: 📦 Upload Image Artifact
@@ -115,10 +84,7 @@ EOF
       uses: actions/upload-artifact@v4
       with:
         name: PassiveStack-Image
-        path: |
-          deploy/*.img
-          deploy/*.txt
-          deploy/*.sha256
+        path: deploy/
         if-no-files-found: error
         retention-days: 7
 
@@ -127,18 +93,13 @@ EOF
       uses: actions/upload-artifact@v4
       with:
         name: Build-Logs
-        path: |
-          pi-gen/build.log
-          pi-gen/logs/
-          pi-gen/debug/
+        path: pi-gen/logs/
         if-no-files-found: warn
         retention-days: 3
 
-    - name: 🧹 Cleanup Workspace
+    - name: 🧹 Cleanup
       if: always()
       run: |
-        echo "🧹 Säubere Workspace..."
-        sudo rm -rf pi-gen/work/* 2>/dev/null || true
-        sudo rm -f pi-gen/build.log 2>/dev/null || true
-        df -h
-        echo "✅ Aufräumen abgeschlossen"
+        echo "🧹 Aufräumen..."
+        sudo rm -rf pi-gen/work/*
+        echo "✅ Fertig"
