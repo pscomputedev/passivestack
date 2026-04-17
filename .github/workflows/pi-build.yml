@@ -36,7 +36,8 @@ jobs:
           git checkout bullseye
           
           echo "📝 Erstelle config Datei..."
-          cat > config << 'EOF'
+          # Konfiguration OHNE Heredoc
+          cat > config << "CONFIG_END"
 IMG_NAME=PassiveStack-v1.3
 RELEASE=bullseye
 DEPLOY_ZIP=0
@@ -57,7 +58,7 @@ SKIP_IMAGES=1
 NOOBS=0
 SKIP_NOOBS=1
 STAGE_LIST="stage0 stage1 stage2 stage3"
-EOF
+CONFIG_END
           
           echo "📄 Config-Inhalt:"
           cat config
