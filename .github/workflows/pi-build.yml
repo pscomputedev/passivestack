@@ -1,84 +1,112 @@
-name: Build PassiveStack Pi Image
+name: PassiveStack Pi-Image Build
+
 on:
-  workflow_dispatch:
   push:
-    tags:
-      - 'v*'
+    branches: [ main ]
+  pull_request:
+    branches: [ main ]
+  workflow_dispatch:
+
 jobs:
   build:
     runs-on: ubuntu-latest
-    timeout-minutes: 120
+    env:
+      DEPLOY_DIR: ./deploy
+      RPI_BOOT_FIRMWARE_VERSIONS: "v8"
+      SKIP_IMAGES: 1
+      NOOBS: 0
+      SKIP_NOOBS: 1
+      IMG_SUFFIX: "-PassiveStack-v1.3"
+
     steps:
-      - name: Checkout passivestack repo
-        uses: actions/checkout@v4
-        with:
-          path: passivestack
+    - name: 📥 Checkout Repository
+      uses: actions/checkout@v4
+      with:
+        submodules: recursive
+        fetch-depth: 0
 
-      - name: Install qemu-user-static
-        run: |
-          sudo apt-get update
-          sudo apt-get install -y qemu-user-static
-          sudo ln -s /usr/bin/qemu-arm-static /usr/local/bin/qemu-arm
+    - name: 🛠️ Setup pi-gen
+      run: |
+        echo "📦 Installiere Abhängigkeiten..."
+        sudo apt-get update
+        sudo apt-get install -y \
+          coreutils quilt parted qemu-user-static debootstrap zerofree zip \
+          dosfstools bsdtar libcap2-bin grep rsync xz-utils file git curl bc \
+          qemu-utils kpartx pigz
+    
+    - name: 🔧 Configure pi-gen
+      run: |
+        echo "⚙️ Konfiguriere pi-gen..."
+        cd pi-gen
+        git checkout bullseye
+        
+        echo "📝 Schreibe config..."
+        cat > config << EOF
+        IMG_NAME=PassiveStack-v1.3
+        RELEASE=bullseye
+        DEPLOY_ZIP=0
+        DEPLOY_DIR="../$DEPLOY_DIR"
+        LOCALE_DEFAULT=en_US.UTF-8
+        TARGET_HOSTNAME=passivestack
+        KEYBOARD_KEYMAP=de
+        KEYBOARD_LAYOUT="German"
+        TIMEZONE_DEFAULT=Europe/Berlin
+        ENABLE_SSH=1
+        PUBKEY_ONLY_SSH=0
+        SSH_ENABLE_ROOT=0
+        USE_QCOW2=0
+        COMPRESS_DISK=1
+        IMG_SUFFIX=$IMG_SUFFIX
+        RPI_BOOT_FIRMWARE_VERSIONS=$RPI_BOOT_FIRMWARE_VERSIONS
+        SKIP_IMAGES=$SKIP_IMAGES
+        NOOBS=$NOOBS
+        SKIP_NOOBS=$SKIP_NOOBS
+        STAGE_LIST="stage0 stage1 stage2 stage3"
+        EOF
+        
+        echo "📄 Config-Inhalt:"
+        cat config
+        
+        echo "📁 Prüfe Stage-Verzeichnisse..."
+        ls -la stage3/
 
-      - name: Clone pi-gen (bookworm branch)
-        run: git clone --depth 1 --branch bookworm https://github.com/RPi-Distro/pi-gen.git pi-gen
+    - name: 🏗️ Build Image
+      run: |
+        echo "🚀 Starte Build-Prozess..."
+        cd pi-gen
+        sudo ./build.sh
+        
+        echo "✅ Build abgeschlossen!"
+        echo "📁 Resultate:"
+        ls -la "$DEPLOY_DIR"/
 
-      - name: Configure pi-gen
-        working-directory: pi-gen
-        run: |
-          cp ../passivestack/image/pi-gen-config config
-          echo 'DEPLOY_ZIP=1' >> config
-          echo 'STAGE_LIST="stage0 stage1 stage2 stage3"' >> config
+    - name: 📦 Upload Image Artifact
+      if: success()
+      uses: actions/upload-artifact@v4
+      with:
+        name: PassiveStack-Image
+        path: |
+          deploy/*.img
+          deploy/*.txt
+          deploy/*.sha256
+        if-no-files-found: error
+        retention-days: 7
 
-      - name: Patch sshd_config for password login
-        working-directory: pi-gen
-        run: |
-          cat >> stage2/01-sys-tweaks/01-run.sh << 'EOF'
-          sed -i 's/^#\?[[:blank:]]*PasswordAuthentication.*/PasswordAuthentication yes/' "${ROOTFS_DIR}/etc/ssh/sshd_config"
-          echo "PasswordAuthentication yes" >> "${ROOTFS_DIR}/etc/ssh/sshd_config"
-          EOF
+    - name: 📊 Upload Build Logs
+      if: always()
+      uses: actions/upload-artifact@v4
+      with:
+        name: Build-Logs
+        path: |
+          pi-gen/logs/
+          pi-gen/debug/
+        if-no-files-found: warn
+        retention-days: 3
 
-      - name: Copy stage-passivestack as stage3
-        run: |
-          rm -rf pi-gen/stage3
-          cp -r passivestack/image/stage-passivestack pi-gen/stage3
-
-      - name: Populate stage files
-        run: |
-          FILES_DIR="pi-gen/stage3/00-passivestack/files"
-          mkdir -p "${FILES_DIR}/passivestack/config"
-          mkdir -p "${FILES_DIR}/passivestack/image"
-
-          cp passivestack/install.sh           "${FILES_DIR}/passivestack/"
-          cp passivestack/bootstrap.sh         "${FILES_DIR}/passivestack/"
-          cp passivestack/generate-compose.py  "${FILES_DIR}/passivestack/"
-          cp passivestack/status-updater.sh    "${FILES_DIR}/passivestack/"
-          cp passivestack/config/apps.json     "${FILES_DIR}/passivestack/config/"
-          cp passivestack/image/firstboot.sh                    "${FILES_DIR}/passivestack/image/"
-          cp passivestack/image/passivestack-firstboot.service  "${FILES_DIR}/"
-
-          echo "=== Files staged ==="
-          find "${FILES_DIR}" -type f | sort
-
-      - name: Fix permissions
-        run: chmod +x pi-gen/stage3/00-passivestack/prerun.sh
-
-      - name: Set EXPORT_IMAGE for stage3
-        run: touch pi-gen/stage3/EXPORT_IMAGE
-
-      - name: Build image via Docker
-        working-directory: pi-gen
-        env:
-          PIGEN_DOCKER_OPTS: "-v /usr/bin/qemu-arm-static:/usr/bin/qemu-arm-static"
-        run: ./build-docker.sh
-
-      - name: Upload image artifact
-        uses: actions/upload-artifact@v4
-        with:
-          name: passivestack-image
-          path: |
-            pi-gen/deploy/*.zip
-            pi-gen/deploy/*.img
-            pi-gen/deploy/*.img.xz
-          if-no-files-found: error
-          retention-days: 7
+    - name: 🧹 Cleanup Workspace
+      if: always()
+      run: |
+        echo "🧹 Säubere Workspace..."
+        sudo rm -rf pi-gen/work/*
+        sudo rm -rf pi-gen/deploy/*
+        df -h
