@@ -1,139 +1,136 @@
 {
-  "system": {
-    "network": {
-      "driver": "bridge",
-      "subnet": "172.20.0.0",
-      "netmask": "16"
-    },
-    "dns": {
-      "servers": [
-        "8.8.8.8",
-        "1.1.1.1"
+  "apps": {
+    "earnapp": {
+      "image": "farukt/docker-earnapp:latest",
+      "restart": "unless-stopped",
+      "environment": {
+        "EARNAPP_UUID": "",
+        "EARNAPP_EMAIL": "",
+        "EARNAPP_REFCODE": ""
+      },
+      "volumes": [
+        "./data/earnapp:/app/data"
       ],
-      "options": [
-        "ndots:1"
-      ]
+      "network_mode": "host",
+      "privileged": false
     },
-    "watchtower": {
-      "scope": "passivestack",
-      "image": "nickfedor/watchtower:latest",
-      "poll_interval": 14400
+    "honeygain": {
+      "image": "honeygain/honeygain:latest",
+      "restart": "unless-stopped",
+      "environment": {
+        "EMAIL": "",
+        "PASS": ""
+      },
+      "volumes": [
+        "./data/honeygain:/app/data"
+      ],
+      "network_mode": "host",
+      "privileged": false
     },
-    "resource_limits": {
-      "little": { "cpus": 0.1, "mem_reservation": "32m", "mem_limit": "128m" },
-      "medium": { "cpus": 0.2, "mem_reservation": "64m", "mem_limit": "256m" },
-      "big":    { "cpus": 0.5, "mem_reservation": "128m", "mem_limit": "512m" }
+    "iproyal": {
+      "image": "iproyal/pawns-cli:latest",
+      "restart": "unless-stopped",
+      "environment": {
+        "EMAIL": "",
+        "PASSWORD": ""
+      },
+      "volumes": [
+        "./data/iproyal:/app/data"
+      ],
+      "network_mode": "host",
+      "privileged": false
+    },
+    "packetstream": {
+      "image": "packetstream/psclient:latest",
+      "restart": "unless-stopped",
+      "environment": {
+        "CID": ""
+      },
+      "volumes": [
+        "./data/packetstream:/app/data"
+      ],
+      "network_mode": "host",
+      "privileged": false
+    },
+    "peer2profit": {
+      "image": "peer2profit/peer2profit_x86_64:latest",
+      "restart": "unless-stopped",
+      "environment": {
+        "EMAIL": ""
+      },
+      "volumes": [
+        "./data/peer2profit:/app/data"
+      ],
+      "network_mode": "host",
+      "privileged": false
+    },
+    "traffmonetizer": {
+      "image": "traffmonetizer/cli_v2:latest",
+      "restart": "unless-stopped",
+      "environment": {
+        "TOKEN": ""
+      },
+      "volumes": [
+        "./data/traffmonetizer:/app/data"
+      ],
+      "network_mode": "host",
+      "privileged": false
+    },
+    "repocket": {
+      "image": "repocket/repocket-node:latest",
+      "restart": "unless-stopped",
+      "environment": {
+        "EMAIL": "",
+        "API_KEY": ""
+      },
+      "volumes": [
+        "./data/repocket:/app/data"
+      ],
+      "network_mode": "host",
+      "privileged": false
+    },
+    "earnfish": {
+      "image": "earnfish/earnfish:latest",
+      "restart": "unless-stopped",
+      "environment": {
+        "TOKEN": ""
+      },
+      "volumes": [
+        "./data/earnfish:/app/data"
+      ],
+      "network_mode": "host",
+      "privileged": false
+    },
+    "bitping": {
+      "image": "bitping/node:latest",
+      "restart": "unless-stopped",
+      "environment": {
+        "EMAIL": "",
+        "PASSWORD": "",
+        "MFA_CODE": ""
+      },
+      "volumes": [
+        "./data/bitping:/app/data"
+      ],
+      "network_mode": "host",
+      "privileged": false
+    },
+    "mysterium": {
+      "image": "mysteriumnetwork/myst:latest",
+      "restart": "unless-stopped",
+      "environment": {
+        "IDENTITY_PASSWORD": ""
+      },
+      "volumes": [
+        "./data/mysterium:/var/lib/mysterium-node"
+      ],
+      "network_mode": "host",
+      "ports": [
+        "4449:4449"
+      ],
+      "cap_add": ["NET_ADMIN"],
+      "privileged": true,
+      "devices": ["/dev/net/tun"]
     }
-  },
-  "apps": [
-    {
-      "name": "earnapp",
-      "label": "EarnApp",
-      "auth_type": "uuid",
-      "enabled_default": true,
-      "referral": "https://earnapp.com/i/passivestack",
-      "platforms": ["linux/arm64", "linux/arm/v7", "linux/amd64"],
-      "compose": {
-        "image": "fazalfarhan01/earnapp:lite",
-        "restart": "always",
-        "environment": ["EARNAPP_UUID=${EARNAPP_UUID}"],
-        "volumes": ["./.data/.earnapp:/etc/earnapp"],
-        "cpus": 0.1,
-        "mem_reservation": "32m",
-        "mem_limit": "128m"
-      }
-    },
-    {
-      "name": "bitping",
-      "label": "Bitping",
-      "auth_type": "email_password",
-      "enabled_default": true,
-      "referral": "https://app.bitping.com?r=passivestack",
-      "platforms": ["linux/amd64"],
-      "compose": {
-        "image": "bitping/bitping-node:latest",
-        "restart": "always",
-        "platform": "linux/amd64",
-        "environment": [
-          "BITPING_EMAIL=${BITPING_EMAIL}",
-          "BITPING_PASSWORD=${BITPING_PASSWORD}"
-        ],
-        "volumes": ["./.data/.bitpingd:/root/.bitpingd"],
-        "cpus": 0.1,
-        "mem_reservation": "32m",
-        "mem_limit": "128m"
-      }
-    },
-    {
-      "name": "packetstream",
-      "label": "PacketStream",
-      "auth_type": "cid",
-      "enabled_default": true,
-      "referral": "https://packetstream.io/?psr=passivestack",
-      "platforms": ["linux/arm64", "linux/arm/v7", "linux/amd64"],
-      "compose": {
-        "image": "packetstream/psclient:latest",
-        "restart": "always",
-        "environment": ["CID=${PACKETSTREAM_CID}"],
-        "cpus": 0.1,
-        "mem_reservation": "32m",
-        "mem_limit": "128m"
-      }
-    },
-    {
-      "name": "traffmonetizer",
-      "label": "Traff Monetizer",
-      "auth_type": "token",
-      "enabled_default": true,
-      "referral": "https://traffmonetizer.com/?aff=passivestack",
-      "platforms": ["linux/amd64"],
-      "compose": {
-        "image": "traffmonetizer/cli_v2:latest",
-        "restart": "always",
-        "platform": "linux/amd64",
-        "command": "start accept --token ${TRAFFMONETIZER_TOKEN}",
-        "cpus": 0.1,
-        "mem_reservation": "32m",
-        "mem_limit": "128m"
-      }
-    },
-    {
-      "name": "repocket",
-      "label": "Repocket",
-      "auth_type": "email_apikey",
-      "enabled_default": true,
-      "referral": "https://link.repocket.co/passivestack",
-      "platforms": ["linux/arm64", "linux/amd64"],
-      "compose": {
-        "image": "repocket/repocket:latest",
-        "restart": "always",
-        "environment": [
-          "RP_EMAIL=${REPOCKET_EMAIL}",
-          "RP_API_KEY=${REPOCKET_APIKEY}"
-        ],
-        "cpus": 0.1,
-        "mem_reservation": "32m",
-        "mem_limit": "128m"
-      }
-    },
-    {
-      "name": "mysterium",
-      "label": "Mysterium Node",
-      "auth_type": "manual",
-      "enabled_default": false,
-      "referral": "https://mystnodes.com",
-      "platforms": ["linux/arm64", "linux/amd64"],
-      "compose": {
-        "image": "mysteriumnetwork/myst:latest",
-        "restart": "always",
-        "command": "service --agreed-terms-and-conditions",
-        "cap_add": ["NET_ADMIN"],
-        "ports": ["${MYSTNODE_PORT}:4449"],
-        "volumes": ["./.data/.mysterium-node:/var/lib/mysterium-node"],
-        "cpus": 0.2,
-        "mem_reservation": "64m",
-        "mem_limit": "256m"
-      }
-    }
-  ]
+  }
 }
