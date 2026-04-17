@@ -1,549 +1,311 @@
-#!/usr/bin/env bash
-# ============================================================
-# PassiveStack — install.sh
-# Interaktiver Installer für den Bandwidth-Sharing Stack
-# https://passivecompute.de
-# ============================================================
+#!/bin/bash
+# PassiveStack Installation Script - Korrigierte Version
+set -e  # Beende bei Fehlern
 
-set -euo pipefail
-
-# ── Farben & Symbole ─────────────────────────────────────────
+# Farben für Ausgabe
 RED='\033[0;31m'
 GREEN='\033[0;32m'
 YELLOW='\033[1;33m'
-BLUE='\033[0;34m'
-CYAN='\033[0;36m'
-BOLD='\033[1m'
 NC='\033[0m' # No Color
 
-OK="✅"
-WARN="⚠️ "
-ERR="❌"
-INFO="ℹ️ "
-ARROW="→"
-
-# ── Pfade ────────────────────────────────────────────────────
-SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
-CONFIG_DIR="${SCRIPT_DIR}/config"
-APPS_JSON="${CONFIG_DIR}/apps.json"
-USER_CONFIG="${CONFIG_DIR}/user-config.json"
-ENV_FILE="${SCRIPT_DIR}/.env"
-DATA_DIR="${SCRIPT_DIR}/.data"
-LOG_FILE="${SCRIPT_DIR}/install.log"
-
-# ── Logging ──────────────────────────────────────────────────
-exec > >(tee -a "${LOG_FILE}") 2>&1
-
-log()  { echo -e "${CYAN}[$(date '+%H:%M:%S')]${NC} $*"; }
-ok()   { echo -e "${GREEN}${OK}${NC} $*"; }
-warn() { echo -e "${YELLOW}${WARN}${NC} $*"; }
-err()  { echo -e "${RED}${ERR}${NC} $*"; }
-info() { echo -e "${BLUE}${INFO}${NC} $*"; }
-ask()  { echo -e "${BOLD}${ARROW}${NC} $*"; }
-
-# ── Banner ───────────────────────────────────────────────────
-print_banner() {
-  echo ""
-  echo -e "${YELLOW}${BOLD}"
-  echo "  ╔═══════════════════════════════════════════╗"
-  echo "  ║         ☀️  PassiveStack Installer         ║"
-  echo "  ║     Solar-powered passive income stack    ║"
-  echo "  ║          passivecompute.de  v1.0          ║"
-  echo "  ╚═══════════════════════════════════════════╝"
-  echo -e "${NC}"
+# Log-Funktionen
+log_info() {
+    echo -e "${GREEN}[INFO]${NC} $1"
 }
 
-# ── Hilfsfunktionen ──────────────────────────────────────────
-confirm() {
-  local prompt="${1:-Fortfahren?}"
-  local default="${2:-y}"
-  local answer
-  if [[ "${default}" == "y" ]]; then
-    read -rp "$(echo -e "${BOLD}${ARROW}${NC} ${prompt} [Y/n]: ")" answer </dev/tty
-    answer="${answer:-y}"
-  else
-    read -rp "$(echo -e "${BOLD}${ARROW}${NC} ${prompt} [y/N]: ")" answer </dev/tty
-    answer="${answer:-n}"
-  fi
-  [[ "${answer,,}" == "y" ]]
+log_warn() {
+    echo -e "${YELLOW}[WARN]${NC} $1"
 }
 
-prompt() {
-  local varname="$1"
-  local prompt_text="$2"
-  local default="${3:-}"
-  local secret="${4:-false}"
-
-  if [[ -n "${default}" ]]; then
-    prompt_text="${prompt_text} [${default}]"
-  fi
-
-  if [[ "${secret}" == "true" ]]; then
-    read -rsp "$(echo -e "${BOLD}${ARROW}${NC} ${prompt_text}: ")" value </dev/tty
-    echo ""
-  else
-    read -rp "$(echo -e "${BOLD}${ARROW}${NC} ${prompt_text}: ")" value </dev/tty
-  fi
-
-  value="${value:-${default}}"
-  printf -v "${varname}" '%s' "${value}"
+log_error() {
+    echo -e "${RED}[ERROR]${NC} $1"
 }
 
-divider() {
-  echo -e "${BLUE}────────────────────────────────────────────────${NC}"
+# Prüfe Root-Rechte
+check_root() {
+    if [ "$EUID" -ne 0 ]; then
+        log_error "Dieses Script benötigt sudo Rechte!"
+        echo "Bitte ausführen mit: sudo ./install.sh"
+        exit 1
+    fi
 }
 
-# ── Voraussetzungen prüfen ───────────────────────────────────
-check_requirements() {
-  divider
-  log "Prüfe Voraussetzungen..."
-  local missing=()
-
-  if command -v docker &>/dev/null; then
-    local docker_ver
-    docker_ver=$(docker --version | grep -oP '\d+\.\d+')
-    ok "Docker installiert: ${docker_ver}"
-  else
-    err "Docker nicht gefunden"
-    missing+=("docker")
-  fi
-
-  if docker compose version &>/dev/null 2>&1; then
-    ok "Docker Compose Plugin verfügbar"
-  elif command -v docker-compose &>/dev/null; then
-    warn "Altes docker-compose gefunden — bitte auf Docker Compose Plugin upgraden"
-  else
-    err "Docker Compose nicht gefunden"
-    missing+=("docker-compose")
-  fi
-
-  if command -v python3 &>/dev/null; then
-    ok "Python3 verfügbar"
-  else
-    err "Python3 nicht gefunden"
-    missing+=("python3")
-  fi
-
-  if python3 -c "import yaml" &>/dev/null 2>&1; then
-    ok "PyYAML verfügbar"
-  else
-    warn "PyYAML fehlt — wird installiert..."
-    pip3 install pyyaml --break-system-packages -q 2>/dev/null || \
-    pip3 install pyyaml -q 2>/dev/null || \
-    { err "PyYAML konnte nicht installiert werden"; missing+=("pyyaml"); }
-  fi
-
-  if command -v jq &>/dev/null; then
-    ok "jq verfügbar"
-  else
-    warn "jq nicht gefunden (optional) — sudo apt install jq"
-  fi
-
-  ARCH=$(uname -m)
-  case "${ARCH}" in
-    x86_64|amd64) DOCKER_ARCH="amd64" ;;
-    aarch64|arm64) DOCKER_ARCH="arm64" ;;
-    armv7l) DOCKER_ARCH="arm/v7" ;;
-    *) DOCKER_ARCH="amd64"; warn "Unbekannte Architektur: ${ARCH} — setze amd64" ;;
-  esac
-  ok "Architektur: ${ARCH} → Docker: linux/${DOCKER_ARCH}"
-
-  if [[ ${#missing[@]} -gt 0 ]]; then
-    err "Fehlende Voraussetzungen: ${missing[*]}"
-    echo ""
-    info "Docker installieren: curl -fsSL https://get.docker.com | bash"
-    exit 1
-  fi
+# Prüfe Betriebssystem
+check_os() {
+    if ! command -v lsb_release &> /dev/null; then
+        apt-get update && apt-get install -y lsb-release
+    fi
+    
+    OS=$(lsb_release -si)
+    ARCH=$(uname -m)
+    
+    case "$ARCH" in
+        "x86_64") ARCH="amd64" ;;
+        "aarch64"|"armv8l"|"armv7l") ARCH="arm64" ;;
+        *) ARCH="unknown" ;;
+    esac
+    
+    log_info "Betriebssystem: $OS"
+    log_info "Architektur: $ARCH"
+    
+    if [ "$ARCH" = "unknown" ]; then
+        log_error "Nicht unterstützte Architektur: $(uname -m)"
+        exit 1
+    fi
 }
 
-# ── Gerätename ───────────────────────────────────────────────
-setup_device() {
-  divider
-  log "Gerätekonfiguration..."
-  echo ""
-
-  local hostname_default
-  hostname_default=$(hostname 2>/dev/null || echo "my-device")
-  hostname_default=$(echo "${hostname_default}" | tr '[:upper:]' '[:lower:]' | sed 's/[^a-z0-9-]/-/g')
-
-  prompt DEVICE_NAME "Gerätename (wird als Container-Prefix verwendet)" "${hostname_default}"
-  DEVICE_NAME=$(echo "${DEVICE_NAME}" | tr '[:upper:]' '[:lower:]' | sed 's/[^a-z0-9-]/-/g')
-  ok "Gerätename: ${DEVICE_NAME}"
-}
-
-# ── App-Konfiguration ────────────────────────────────────────
-setup_apps() {
-  divider
-  log "App-Konfiguration..."
-  echo ""
-  info "Konfiguriere nur Apps für die du bereits einen Account hast."
-  info "Nicht konfigurierte Apps werden deaktiviert."
-  echo ""
-
-  declare -gA APP_ENABLED
-  declare -gA APP_CONFIG
-
-  local apps_names
-  apps_names=$(python3 -c "
-import json
-with open('${APPS_JSON}') as f:
-    d = json.load(f)
-for app in d['apps']:
-    print(app['name'] + '|' + app['label'] + '|' + app['auth_type'] + '|' + str(app['enabled_default']).lower())
-")
-
-  while IFS='|' read -r name label auth_type enabled_default; do
-    echo ""
-    echo -e "${BOLD}── ${label} ──${NC}"
-
-    local ref_url
-    ref_url=$(python3 -c "
-import json
-with open('${APPS_JSON}') as f:
-    d = json.load(f)
-for app in d['apps']:
-    if app['name'] == '${name}':
-        print(app.get('referral') or 'kein Referral')
-        break
-")
-    info "Registrieren: ${ref_url}"
-
-    if confirm "Hast du einen Account bei ${label}?" "${enabled_default}"; then
-      APP_ENABLED["${name}"]="true"
-      configure_app "${name}" "${label}" "${auth_type}"
+# Prüfe Docker
+check_docker() {
+    if ! command -v docker &> /dev/null; then
+        log_warn "Docker nicht gefunden. Installiere..."
+        curl -fsSL https://get.docker.com -o get-docker.sh
+        sh get-docker.sh
+        rm get-docker.sh
+        usermod -aG docker $USER
     else
-      APP_ENABLED["${name}"]="false"
-      ok "${label} übersprungen"
+        log_info "Docker ist installiert"
     fi
-  done <<< "${apps_names}"
+    
+    # Starte Docker wenn nicht läuft
+    if ! systemctl is-active --quiet docker; then
+        log_warn "Docker Dienst wird gestartet..."
+        systemctl start docker
+        systemctl enable docker
+    fi
 }
 
-# ── Einzelne App konfigurieren ───────────────────────────────
-configure_app() {
-  local name="$1"
-  local label="$2"
-  local auth_type="$3"
-
-  case "${auth_type}" in
-    uuid)
-      local uuid
-      uuid=$(python3 -c "import uuid; print(uuid.uuid4().hex)")
-      APP_CONFIG["${name}_uuid"]="${uuid}"
-      ok "${label}: UUID generiert: sdk-node-${uuid}"
-      info "Claim-Link: https://earnapp.com/r/sdk-node-${uuid}"
-      ;;
-
-    email_password)
-      prompt "APP_EMAIL" "${label} E-Mail"
-      prompt "APP_PASS"  "${label} Passwort" "" "true"
-      APP_CONFIG["${name}_email"]="${APP_EMAIL}"
-      APP_CONFIG["${name}_password"]="${APP_PASS}"
-      ok "${label}: E-Mail + Passwort gespeichert"
-      ;;
-
-    token)
-      prompt "APP_TOKEN" "${label} Token/API-Key"
-      APP_CONFIG["${name}_token"]="${APP_TOKEN}"
-      ok "${label}: Token gespeichert"
-      ;;
-
-    apikey)
-      prompt "APP_KEY" "${label} API-Key"
-      APP_CONFIG["${name}_apikey"]="${APP_KEY}"
-      ok "${label}: API-Key gespeichert"
-      ;;
-
-    cid)
-      prompt "APP_CID" "${label} CID (z.B. psr=XXXX)"
-      APP_CONFIG["${name}_cid"]="${APP_CID}"
-      ok "${label}: CID gespeichert"
-      ;;
-
-    email_apikey)
-      prompt "APP_EMAIL"  "${label} E-Mail"
-      prompt "APP_APIKEY" "${label} API-Key"
-      APP_CONFIG["${name}_email"]="${APP_EMAIL}"
-      APP_CONFIG["${name}_apikey"]="${APP_APIKEY}"
-      ok "${label}: E-Mail + API-Key gespeichert"
-      ;;
-
-    manual)
-      warn "${label}: Manuelle Einrichtung nach dem Start erforderlich"
-      info "Dashboard wird nach dem Start unter http://DEVICE_IP:4449 erreichbar sein"
-      ;;
-
-    *)
-      warn "Unbekannter Auth-Typ: ${auth_type}"
-      ;;
-  esac
+# Prüfe Docker Compose
+check_docker_compose() {
+    if ! command -v docker-compose &> /dev/null; then
+        log_warn "Docker Compose nicht gefunden. Installiere..."
+        
+        # Für ARM64 (Raspberry Pi) spezielle Installation
+        if [ "$ARCH" = "arm64" ]; then
+            curl -L "https://github.com/docker/compose/releases/download/v2.20.0/docker-compose-linux-aarch64" \
+                -o /usr/local/bin/docker-compose
+        else
+            curl -L "https://github.com/docker/compose/releases/download/v2.20.0/docker-compose-linux-$(uname -m)" \
+                -o /usr/local/bin/docker-compose
+        fi
+        
+        chmod +x /usr/local/bin/docker-compose
+    else
+        log_info "Docker Compose ist installiert"
+    fi
 }
 
-# ── user-config.json schreiben ───────────────────────────────
-write_user_config() {
-  divider
-  log "Schreibe user-config.json..."
+# Backup bestehender Installation
+backup_existing() {
+    local backup_dir="/var/backups/passivestack_$(date +%Y%m%d_%H%M%S)"
+    
+    if [ -d "/opt/passivestack" ]; then
+        log_info "Erstelle Backup in $backup_dir"
+        mkdir -p "$backup_dir"
+        
+        # Backup Compose-Datei
+        if [ -f "/opt/passivestack/docker-compose.yaml" ]; then
+            cp "/opt/passivestack/docker-compose.yaml" "$backup_dir/"
+        fi
+        
+        # Backup Config
+        if [ -d "/opt/passivestack/config" ]; then
+            cp -r "/opt/passivestack/config" "$backup_dir/"
+        fi
+        
+        log_info "Backup abgeschlossen"
+    fi
+}
 
-  python3 - <<PYEOF
-import json, os
+# Kopiere Dateien
+copy_files() {
+    local install_dir="/opt/passivestack"
+    
+    log_info "Kopiere Dateien nach $install_dir"
+    
+    # Erstelle Verzeichnisstruktur
+    mkdir -p "$install_dir"
+    mkdir -p "$install_dir/config"
+    mkdir -p "$install_dir/logs"
+    mkdir -p "$install_dir/data"
+    
+    # Kopiere alle Dateien
+    cp -r ./* "$install_dir/"
+    
+    # Setze korrekte Berechtigungen
+    chmod +x "$install_dir/install.sh"
+    chmod +x "$install_dir/generate-compose.py"
+    chmod +x "$install_dir/update.sh"
+    
+    log_info "Dateien kopiert"
+}
 
-apps_json = json.load(open('${APPS_JSON}'))
-enabled   = {}
-configs   = {}
-
-enabled_raw = """$(for k in "${!APP_ENABLED[@]}"; do echo "${k}=${APP_ENABLED[$k]}"; done)"""
-config_raw  = """$(for k in "${!APP_CONFIG[@]}"; do echo "${k}=${APP_CONFIG[$k]}"; done)"""
-
-for line in enabled_raw.strip().split('\n'):
-    if '=' in line:
-        k, v = line.split('=', 1)
-        enabled[k.strip()] = v.strip() == 'true'
-
-for line in config_raw.strip().split('\n'):
-    if '=' in line:
-        k, v = line.split('=', 1)
-        configs[k.strip()] = v.strip()
-
-user_apps = {}
-for app in apps_json['apps']:
-    name = app['name']
-    auth = app['auth_type']
-    is_enabled = enabled.get(name, app['enabled_default'])
-
-    entry = {
-        'enabled': is_enabled,
-        'docker_platform': 'linux/${DOCKER_ARCH}'
-    }
-
-    if auth == 'uuid':
-        entry['uuid'] = 'sdk-node-' + configs.get(f'{name}_uuid', '')
-    elif auth == 'email_password':
-        entry['email']    = configs.get(f'{name}_email', '')
-        entry['password'] = configs.get(f'{name}_password', '')
-    elif auth == 'token':
-        entry['token'] = configs.get(f'{name}_token', '')
-    elif auth == 'apikey':
-        entry['apikey'] = configs.get(f'{name}_apikey', '')
-    elif auth == 'cid':
-        entry['cid'] = configs.get(f'{name}_cid', '')
-    elif auth == 'email_apikey':
-        entry['email']  = configs.get(f'{name}_email', '')
-        entry['apikey'] = configs.get(f'{name}_apikey', '')
-
-    user_apps[name] = entry
-
-user_cfg = {
-    'device_info': {
-        'device_name':          '${DEVICE_NAME}',
-        'os_type':              'Linux',
-        'detected_architecture':'${ARCH}',
-        'detected_docker_arch': '${DOCKER_ARCH}'
+# Erstelle user-config.json Template
+create_user_config() {
+    local config_file="/opt/passivestack/config/user-config.json"
+    
+    if [ ! -f "$config_file" ]; then
+        log_info "Erstelle user-config.json Template"
+        
+        cat > "$config_file" << EOF
+{
+  "device_name": "passivestack",
+  "apps": {
+    "earnapp": {
+      "enabled": false,
+      "credentials": {
+        "EMAIL": "your-email@example.com",
+        "REFCODE": ""
+      }
     },
-    'apps': user_apps,
-    'watchtower': {'enabled': True},
-    'm4b_dashboard': {'enabled': True, 'ports': [8081]}
+    "honeygain": {
+      "enabled": false,
+      "credentials": {
+        "EMAIL": "your-email@example.com",
+        "PASSWORD": "your-password"
+      }
+    },
+    "iproyal": {
+      "enabled": false,
+      "credentials": {
+        "EMAIL": "your-email@example.com",
+        "PASSWORD": "your-password"
+      }
+    },
+    "packetstream": {
+      "enabled": false,
+      "credentials": {
+        "CID": "your-client-id"
+      }
+    },
+    "peer2profit": {
+      "enabled": false,
+      "credentials": {
+        "EMAIL": "your-email@example.com"
+      }
+    },
+    "traffmonetizer": {
+      "enabled": false,
+      "credentials": {
+        "TOKEN": "your-token"
+      }
+    },
+    "repocket": {
+      "enabled": false,
+      "credentials": {
+        "EMAIL": "your-email@example.com",
+        "API": "your-api-key"
+      }
+    },
+    "earnfish": {
+      "enabled": false,
+      "credentials": {
+        "TOKEN": "your-token"
+      }
+    },
+    "bitping": {
+      "enabled": false,
+      "credentials": {
+        "EMAIL": "your-email@example.com",
+        "PASSWORD": "your-password",
+        "MFA_CODE": ""
+      }
+    },
+    "mysterium": {
+      "enabled": false,
+      "credentials": {
+        "IDENTITY_PASSWORD": "your-password"
+      }
+    }
+  }
 }
-
-os.makedirs('${CONFIG_DIR}', exist_ok=True)
-with open('${USER_CONFIG}', 'w') as f:
-    json.dump(user_cfg, f, indent=2)
-
-print(f'user-config.json geschrieben ({len(user_apps)} Apps)')
-PYEOF
-
-  ok "user-config.json erstellt"
-}
-
-# ── .env Datei schreiben ─────────────────────────────────────
-write_env_file() {
-  divider
-  log "Schreibe .env Datei..."
-
-  python3 - <<PYEOF
-import json
-
-user_cfg  = json.load(open('${USER_CONFIG}'))
-apps_json = json.load(open('${APPS_JSON}'))
-
-lines = [
-    '# PassiveStack .env',
-    '# Generiert von install.sh — nicht manuell bearbeiten',
-    '# Aendern: install.sh erneut ausfuehren',
-    '',
-    f"DEVICE_NAME={user_cfg['device_info']['device_name']}",
-    '',
-]
-
-net = apps_json['system']['network']
-lines += [
-    f"NETWORK_DRIVER={net['driver']}",
-    f"NETWORK_SUBNET={net['subnet']}",
-    f"NETWORK_NETMASK={net['netmask']}",
-    '',
-]
-
-wt = apps_json['system']['watchtower']
-lines += [
-    f"M4B_WATCHTOWER_SCOPE={wt['scope']}",
-    f"M4B_WATCHTOWER_LABELS=true",
-    f"WATCHTOWER_NOTIFICATION_URL=",
-    '',
-]
-
-lines += [
-    'M4B_DASHBOARD_PORT=8081',
-    '',
-]
-
-res = apps_json['system']['resource_limits']
-lines += [
-    f"APP_CPU_LIMIT_LITTLE={res['little']['cpus']}",
-    f"APP_CPU_LIMIT_MEDIUM={res['medium']['cpus']}",
-    f"APP_CPU_LIMIT_BIG={res['big']['cpus']}",
-    f"APP_MEM_RESERV_LITTLE={res['little']['mem_reservation']}",
-    f"APP_MEM_RESERV_MEDIUM={res['medium']['mem_reservation']}",
-    f"APP_MEM_RESERV_BIG={res['big']['mem_reservation']}",
-    f"APP_MEM_LIMIT_LITTLE={res['little']['mem_limit']}",
-    f"APP_MEM_LIMIT_MEDIUM={res['medium']['mem_limit']}",
-    f"APP_MEM_LIMIT_BIG={res['big']['mem_limit']}",
-    '',
-]
-
-for app in apps_json['apps']:
-    name = app['name']
-    auth = app['auth_type']
-    u    = user_cfg['apps'].get(name, {})
-
-    if not u.get('enabled', False):
-        continue
-
-    lines.append(f'# {app["label"]}')
-
-    if auth == 'uuid':
-        lines.append(f"EARNAPP_UUID={u.get('uuid','')}")
-    elif auth == 'email_password':
-        prefix = name.upper()
-        lines.append(f"{prefix}_EMAIL={u.get('email','')}")
-        lines.append(f"{prefix}_PASSWORD={u.get('password','')}")
-    elif auth == 'token':
-        prefix = name.upper()
-        lines.append(f"{prefix}_TOKEN={u.get('token','')}")
-    elif auth == 'apikey':
-        prefix = name.upper()
-        lines.append(f"{prefix}_APIKEY={u.get('apikey','')}")
-    elif auth == 'cid':
-        lines.append(f"PACKETSTREAM_CID={u.get('cid','')}")
-    elif auth == 'email_apikey':
-        prefix = name.upper()
-        lines.append(f"{prefix}_EMAIL={u.get('email','')}")
-        lines.append(f"{prefix}_APIKEY={u.get('apikey','')}")
-
-    lines.append('')
-
-lines.append('MYSTNODE_PORT=4449')
-
-with open('${ENV_FILE}', 'w') as f:
-    f.write('\n'.join(lines) + '\n')
-
-print(f'.env geschrieben ({len(lines)} Zeilen)')
-PYEOF
-
-  chmod 600 "${ENV_FILE}"
-  ok ".env erstellt (chmod 600)"
-}
-
-# ── Docker Compose generieren ────────────────────────────────
-generate_compose() {
-  divider
-  log "Generiere docker-compose.yaml..."
-  python3 "${SCRIPT_DIR}/generate-compose.py"
-  ok "docker-compose.yaml generiert"
-}
-
-# ── Datenverzeichnisse anlegen ───────────────────────────────
-create_data_dirs() {
-  divider
-  log "Lege Datenverzeichnisse an..."
-  local dirs=(
-    "${DATA_DIR}/.earnapp"
-    "${DATA_DIR}/.bitpingd"
-    "${DATA_DIR}/.mysterium-node"
-    "${DATA_DIR}/.gradient"
-  )
-  for dir in "${dirs[@]}"; do
-    mkdir -p "${dir}"
-    ok "Erstellt: ${dir}"
-  done
-}
-
-# ── Stack starten ────────────────────────────────────────────
-start_stack() {
-  divider
-  log "Starte PassiveStack..."
-  echo ""
-
-  if ! confirm "Stack jetzt starten?"; then
-    info "Stack nicht gestartet. Manuell starten mit:"
-    echo "  cd ${SCRIPT_DIR} && docker compose up -d"
-    return
-  fi
-
-  docker compose -f "${SCRIPT_DIR}/docker-compose.yaml" \
-    --env-file "${ENV_FILE}" \
-    --project-name "passivestack" \
-    up -d
-
-  echo ""
-  ok "Stack gestartet!"
-  echo ""
-  log "Laufende Container:"
-  docker compose -f "${SCRIPT_DIR}/docker-compose.yaml" \
-    --project-name "passivestack" \
-    ps --format "table {{.Name}}\t{{.Status}}"
-}
-
-# ── Zusammenfassung ──────────────────────────────────────────
-print_summary() {
-  divider
-  echo ""
-  echo -e "${GREEN}${BOLD}  PassiveStack erfolgreich eingerichtet!${NC}"
-  echo ""
-  echo -e "  ${CYAN}Dashboard:${NC}  http://$(hostname -I | awk '{print $1}'):8081"
-  echo -e "  ${CYAN}Logs:${NC}       docker compose -p passivestack logs -f"
-  echo -e "  ${CYAN}Stoppen:${NC}    docker compose -p passivestack down"
-  echo -e "  ${CYAN}Neustart:${NC}   docker compose -p passivestack restart"
-  echo ""
-
-  if [[ "${APP_ENABLED[earnapp]:-false}" == "true" ]]; then
-    local uuid="${APP_CONFIG[earnapp_uuid]:-}"
-    if [[ -n "${uuid}" ]]; then
-      echo -e "  ${YELLOW}EarnApp Claim:${NC} https://earnapp.com/r/sdk-node-${uuid}"
-      echo ""
+EOF
+        
+        log_warn "⚠️  Bitte bearbeiten: $config_file"
+        log_warn "   Setze 'enabled': true für gewünschte Apps"
+        log_warn "   Trage deine Credentials ein"
+    else
+        log_info "user-config.json existiert bereits"
     fi
-  fi
-
-  echo -e "  ${BLUE}${INFO} Mehr Infos: https://passivecompute.de${NC}"
-  echo ""
-  divider
 }
 
-# ── Hauptprogramm ────────────────────────────────────────────
+# Erstelle docker-compose.yaml
+generate_compose() {
+    log_info "Generiere docker-compose.yaml"
+    
+    cd /opt/passivestack
+    
+    if [ -f "generate-compose.py" ]; then
+        python3 generate-compose.py
+        if [ $? -eq 0 ]; then
+            log_info "docker-compose.yaml erfolgreich generiert"
+        else
+            log_error "Fehler bei generate-compose.py"
+            exit 1
+        fi
+    else
+        log_error "generate-compose.py nicht gefunden"
+        exit 1
+    fi
+}
+
+# Starte Container
+start_containers() {
+    log_info "Starte Docker Container..."
+    
+    cd /opt/passivestack
+    
+    if [ -f "docker-compose.yaml" ]; then
+        docker-compose up -d
+        
+        # Warte auf Container
+        sleep 10
+        
+        # Zeige Status
+        docker-compose ps
+        
+        log_info "✅ PassiveStack wurde erfolgreich installiert!"
+        echo ""
+        echo "📋 NÄCHSTE SCHRITTE:"
+        echo "1. Bearbeite die Konfiguration: /opt/passivestack/config/user-config.json"
+        echo "2. Aktualisiere die Container: cd /opt/passivestack && ./update.sh"
+        echo "3. Logs anzeigen: docker-compose logs -f"
+        echo ""
+        echo "🔧 Verwaltung:"
+        echo "   cd /opt/passivestack"
+        echo "   docker-compose stop      # Stoppt alle Container"
+        echo "   docker-compose start     # Startet alle Container"
+        echo "   docker-compose restart   # Startet alle Container neu"
+        echo "   ./update.sh              # Aktualisiert alle Container"
+        
+    else
+        log_error "docker-compose.yaml nicht gefunden"
+        exit 1
+    fi
+}
+
+# Hauptfunktion
 main() {
-  print_banner
-  log "Installer gestartet: $(date)"
-  log "Log-Datei: ${LOG_FILE}"
-  echo ""
-
-  check_requirements
-  setup_device
-  setup_apps
-  write_user_config
-  write_env_file
-  generate_compose
-  create_data_dirs
-  start_stack
-  print_summary
+    echo "=========================================="
+    echo "🔄 PassiveStack Installation"
+    echo "=========================================="
+    
+    # Prüfungen
+    check_root
+    check_os
+    check_docker
+    check_docker_compose
+    
+    # Installation
+    backup_existing
+    copy_files
+    create_user_config
+    generate_compose
+    start_containers
+    
+    echo "=========================================="
+    echo "✅ Installation abgeschlossen!"
+    echo "=========================================="
 }
 
-if [[ "${BASH_SOURCE[0]}" == "${0}" ]]; then
-  main "$@"
-fi
+# Ausführung
+main "$@"
