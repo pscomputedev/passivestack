@@ -6,16 +6,15 @@ on:
 jobs:
   build:
     runs-on: ubuntu-latest
-    
-    # Node.js 24 forcen um Warnung zu beheben
     env:
       FORCE_JAVASCRIPT_ACTIONS_TO_NODE24: true
-    
+
     steps:
       - name: 📥 Checkout Repository
         uses: actions/checkout@v4
         with:
-          submodules: recursive
+          fetch-depth: 0
+          submodules: true
 
       - name: 🛠️ Install Dependencies
         run: |
@@ -25,27 +24,48 @@ jobs:
             coreutils quilt parted qemu-user-static debootstrap \
             zerofree zip dosfstools libarchive-tools libcap2-bin \
             grep rsync xz-utils file git curl bc qemu-utils kpartx pigz \
-            xxd
-          
-          # QEMU static binaries setup
+            xxd binfmt-support
+
+          echo "=== SETUP QEMU ==="
           sudo update-binfmts --enable qemu-arm
           sudo update-binfmts --enable qemu-aarch64
 
-      - name: 🔧 Setup pi-gen
+      - name: 🔍 Check and Clone pi-gen
         run: |
-          echo "=== SETUP PI-GEN ==="
-          cd pi-gen
-          git checkout bullseye
+          echo "=== CHECK PI-GEN SUBMODULE ==="
           
-          # Config ohne Heredoc
+          if [ ! -d "pi-gen" ]; then
+            echo "pi-gen submodule missing, cloning manually..."
+            git clone https://github.com/RPi-Distro/pi-gen.git
+            cd pi-gen
+            git checkout bullseye
+            cd ..
+          else
+            echo "pi-gen directory exists"
+            cd pi-gen
+            git checkout bullseye
+            cd ..
+          fi
+          
+          echo "=== DIRECTORY CONTENTS ==="
+          ls -la
+          echo "=== PI-GEN CONTENTS ==="
+          ls -la pi-gen/
+
+      - name: 🔧 Setup pi-gen Config
+        run: |
+          echo "=== SETUP PI-GEN CONFIG ==="
+          cd pi-gen
+          
+          # Config erstellen - EINE PRO ZEILE
           echo "IMG_NAME=PassiveStack-v1.3" > config
           echo "RELEASE=bullseye" >> config
           echo "DEPLOY_ZIP=0" >> config
-          echo 'DEPLOY_DIR="../deploy"' >> config
+          echo "DEPLOY_DIR=../deploy" >> config
           echo "LOCALE_DEFAULT=en_US.UTF-8" >> config
           echo "TARGET_HOSTNAME=passivestack" >> config
           echo "KEYBOARD_KEYMAP=de" >> config
-          echo 'KEYBOARD_LAYOUT="German"' >> config
+          echo "KEYBOARD_LAYOUT=German" >> config
           echo "TIMEZONE_DEFAULT=Europe/Berlin" >> config
           echo "ENABLE_SSH=1" >> config
           echo "PUBKEY_ONLY_SSH=0" >> config
@@ -57,82 +77,61 @@ jobs:
           echo "SKIP_IMAGES=1" >> config
           echo "NOOBS=0" >> config
           echo "SKIP_NOOBS=1" >> config
-          echo 'STAGE_LIST="stage0 stage1 stage2 stage3"' >> config
+          echo "STAGE_LIST=stage0 stage1 stage2 stage3" >> config
           
-          echo "=== CONFIG INHALT ==="
+          echo "=== CONFIG CONTENTS ==="
           cat config
-          
-          echo "=== PI-GEN STATUS ==="
-          ls -la
 
       - name: 🔍 Pre-Build Checks
         run: |
           echo "=== PRE-BUILD CHECKS ==="
           cd pi-gen
           
-          # Prüfe ob build.sh ausführbar ist
+          echo "Build script exists:"
           ls -la build.sh
+          chmod +x build.sh
           
-          # Prüfe Verzeichnisstruktur
-          echo "Stage directories:"
-          ls -d stage* || echo "No stage directories"
-          
-          # Prüfe ob als root/sudo möglich
           echo "Current user: $(whoami)"
           echo "Sudo test:"
-          sudo echo "Sudo works!" || echo "Sudo problem"
+          sudo echo "Sudo works!"
+          
+          echo "QEMU binfmt status:"
+          update-binfmts --display | grep -E "qemu.*enabled" || echo "QEMU binfmt check"
 
-      - name: 🏗️ Build Image (mit Debug)
+      - name: 🏗️ Build Image
         run: |
-          echo "=== START BUILD ==="
+          echo "=== BUILD IMAGE ==="
           cd pi-gen
           
-          # Build mit maximalem Logging
-          set -x  # Zeigt jeden Befehl
-          
-          # Versuche verschiedene Build-Methoden
-          echo "Method 1: Direct sudo build.sh"
-          sudo ./build.sh 2>&1 | tee build.log || {
-            echo "Build failed, checking logs..."
-            tail -50 build.log || true
-            echo "Trying alternative method..."
-          }
-          
-          # Alternative: Prüfe ob Docker nötig
-          echo "Checking for Docker method..."
-          if [ -f Dockerfile ]; then
-            echo "Dockerfile found, trying Docker build..."
-            docker build -t pi-gen . || echo "Docker build failed"
-          fi
-          
+          # Build mit detaillierter Ausgabe
+          set -x
+          sudo ./build.sh 2>&1 | tee build.log
           set +x
+          
+          # Prüfe Exit-Status
+          if [ ${PIPESTATUS[0]} -ne 0 ]; then
+            echo "Build failed with exit code ${PIPESTATUS[0]}"
+            echo "Last 100 lines of build.log:"
+            tail -100 build.log
+            exit 1
+          fi
 
-      - name: 📋 Build Logs anzeigen
+      - name: 📋 Show Build Logs
         if: always()
         run: |
-          echo "=== BUILD LOGS ==="
-          cd pi-gen
-          
-          # Letzte 100 Zeilen der Logs
-          if [ -f build.log ]; then
-            tail -100 build.log
+          echo "=== BUILD LOGS TAIL ==="
+          if [ -f "pi-gen/build.log" ]; then
+            tail -200 pi-gen/build.log
           fi
           
-          # Falls vorhanden: stage logs
-          if [ -d logs ]; then
-            echo "=== STAGE LOGS ==="
-            find logs -name "*.log" -exec tail -50 {} \;
-          fi
-          
-          # Prüfe ob deploy existiert
           echo "=== DEPLOY DIRECTORY ==="
-          ls -la ../deploy/ 2>/dev/null || echo "No deploy directory"
+          ls -la deploy/ 2>/dev/null || echo "No deploy directory"
 
-      - name: 📦 Upload Artifacts (wenn erfolgreich)
+      - name: 📦 Upload Artifacts
         if: success()
         uses: actions/upload-artifact@v4
         with:
-          name: PassiveStack-Image
+          name: PassiveStack-RPi-Image
           path: deploy/
           retention-days: 7
 
@@ -140,10 +139,8 @@ jobs:
         if: always()
         uses: actions/upload-artifact@v4
         with:
-          name: Build-Debug-Logs
-          path: |
-            pi-gen/build.log
-            pi-gen/logs/
+          name: Build-Logs
+          path: pi-gen/build.log
           retention-days: 3
 
       - name: 🧹 Cleanup
@@ -151,4 +148,3 @@ jobs:
         run: |
           echo "=== CLEANUP ==="
           sudo rm -rf pi-gen/work/* 2>/dev/null || true
-          echo "Cleanup complete"
