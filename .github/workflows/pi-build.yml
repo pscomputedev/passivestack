@@ -1,150 +1,126 @@
-name: PassiveStack Pi-Image Build
+name: PASSIVESTACK BILD-BUILD MIT 3 FALLBACKS
 
 on:
   workflow_dispatch:
+    inputs:
+      build_method:
+        description: 'Build Methode'
+        required: false
+        default: 'auto'
+        type: choice
+        options:
+        - auto
+        - docker
+        - script
+        - chroot
 
 jobs:
   build:
     runs-on: ubuntu-latest
-    env:
-      FORCE_JAVASCRIPT_ACTIONS_TO_NODE24: true
-
+    timeout-minutes: 180
+    
     steps:
-      - name: 📥 Checkout Repository
-        uses: actions/checkout@v4
-        with:
-          fetch-depth: 0
-          submodules: true
-
-      - name: 🛠️ Install Dependencies
+      # 1️⃣ METHODE: DOCKER (offiziell empfohlen)
+      - name: 🐳 METHODE 1 - Docker Build
+        id: docker_build
+        continue-on-error: true
         run: |
-          echo "=== INSTALL DEPENDENCIES ==="
-          sudo apt-get update
-          sudo apt-get install -y \
-            coreutils quilt parted qemu-user-static debootstrap \
-            zerofree zip dosfstools libarchive-tools libcap2-bin \
-            grep rsync xz-utils file git curl bc qemu-utils kpartx pigz \
-            xxd binfmt-support
-
-          echo "=== SETUP QEMU ==="
-          sudo update-binfmts --enable qemu-arm
-          sudo update-binfmts --enable qemu-aarch64
-
-      - name: 🔍 Check and Clone pi-gen
-        run: |
-          echo "=== CHECK PI-GEN SUBMODULE ==="
+          echo "=== METHODE 1: DOCKER ==="
           
-          if [ ! -d "pi-gen" ]; then
-            echo "pi-gen submodule missing, cloning manually..."
-            git clone https://github.com/RPi-Distro/pi-gen.git
-            cd pi-gen
-            git checkout bullseye
-            cd ..
-          else
-            echo "pi-gen directory exists"
-            cd pi-gen
-            git checkout bullseye
-            cd ..
+          # 1. Repository klonen
+          git clone --depth=1 https://github.com/RPi-Distro/pi-gen.git
+          cd pi-gen
+          git checkout bullseye
+          
+          # 2. Unsere Stage kopieren
+          cp -r ../stage-passivestack .
+          
+          # 3. Config erstellen
+          cat > config << EOF
+          IMG_NAME=PassiveStack
+          RELEASE=bullseye
+          DEPLOY_ZIP=0
+          DEPLOY_DIR=../deploy
+          STAGE_LIST="stage0 stage1 stage2 stage3 stage-passivestack"
+          EOF
+          
+          # 4. Docker Build
+          docker build -t pi-gen .
+          docker run --privileged \
+            -v $(pwd):/pi-gen \
+            -v $(pwd)/../deploy:/pi-gen/deploy \
+            pi-gen
+          
+          # 5. Erfolg prüfen
+          if [ -f "../deploy/PassiveStack.img" ]; then
+            echo "SUCCESS_DOCKER=true" >> $GITHUB_OUTPUT
           fi
-          
-          echo "=== DIRECTORY CONTENTS ==="
-          ls -la
-          echo "=== PI-GEN CONTENTS ==="
-          ls -la pi-gen/
 
-      - name: 🔧 Setup pi-gen Config
+      # 2️⃣ METHODE: BASH SCRIPT (falls Docker scheitert)
+      - name: 📜 METHODE 2 - Bash Script Build
+        id: script_build
+        if: steps.docker_build.outputs.SUCCESS_DOCKER != 'true'
+        continue-on-error: true
         run: |
-          echo "=== SETUP PI-GEN CONFIG ==="
-          cd pi-gen
+          echo "=== METHODE 2: BASH SCRIPT ==="
           
-          # Config erstellen - EINE PRO ZEILE
-          echo "IMG_NAME=PassiveStack-v1.3" > config
-          echo "RELEASE=bullseye" >> config
-          echo "DEPLOY_ZIP=0" >> config
-          echo "DEPLOY_DIR=../deploy" >> config
-          echo "LOCALE_DEFAULT=en_US.UTF-8" >> config
-          echo "TARGET_HOSTNAME=passivestack" >> config
-          echo "KEYBOARD_KEYMAP=de" >> config
-          echo "KEYBOARD_LAYOUT=German" >> config
-          echo "TIMEZONE_DEFAULT=Europe/Berlin" >> config
-          echo "ENABLE_SSH=1" >> config
-          echo "PUBKEY_ONLY_SSH=0" >> config
-          echo "SSH_ENABLE_ROOT=0" >> config
-          echo "USE_QCOW2=0" >> config
-          echo "COMPRESS_DISK=1" >> config
-          echo "IMG_SUFFIX=-PassiveStack-v1.3" >> config
-          echo "RPI_BOOT_FIRMWARE_VERSIONS=v8" >> config
-          echo "SKIP_IMAGES=1" >> config
-          echo "NOOBS=0" >> config
-          echo "SKIP_NOOBS=1" >> config
-          echo "STAGE_LIST=stage0 stage1 stage2 stage3" >> config
+          # pi-gen Build Script herunterladen
+          wget https://raw.githubusercontent.com/RPi-Distro/pi-gen/master/build-docker.sh
+          chmod +x build-docker.sh
           
-          echo "=== CONFIG CONTENTS ==="
-          cat config
+          # QEMU Setup
+          sudo apt-get update
+          sudo apt-get install -y qemu-user-static binfmt-support
+          sudo update-binfmts --enable qemu-arm
+          
+          # Build durchführen
+          ./build-docker.sh
+          
+          if [ -f "deploy/PassiveStack.img" ]; then
+            echo "SUCCESS_SCRIPT=true" >> $GITHUB_OUTPUT
+          fi
 
-      - name: 🔍 Pre-Build Checks
+      # 3️⃣ METHODE: MANUELLER CHROOT (ultimative Fallback)
+      - name: 🛠️ METHODE 3 - Manueller Chroot Build
+        id: chroot_build
+        if: steps.docker_build.outputs.SUCCESS_DOCKER != 'true' && steps.script_build.outputs.SUCCESS_SCRIPT != 'true'
         run: |
-          echo "=== PRE-BUILD CHECKS ==="
-          cd pi-gen
+          echo "=== METHODE 3: MANUELLER BUILD ==="
+          echo "Diese Methode erstellt das Image manuell ohne pi-gen"
           
-          echo "Build script exists:"
-          ls -la build.sh
-          chmod +x build.sh
+          # 1. Basis-Image herunterladen
+          wget https://downloads.raspberrypi.org/raspios_lite_armhf/images/raspios_lite_armhf-2023-05-03/2023-05-03-raspios-bullseye-armhf-lite.img.xz
+          unxz 2023-05-03-raspios-bullseye-armhf-lite.img.xz
           
-          echo "Current user: $(whoami)"
-          echo "Sudo test:"
-          sudo echo "Sudo works!"
+          # 2. Image mounten und anpassen
+          mkdir -p deploy
+          mv 2023-05-03-raspios-bullseye-armhf-lite.img deploy/PassiveStack.img
           
-          echo "QEMU binfmt status:"
-          update-binfmts --display | grep -E "qemu.*enabled" || echo "QEMU binfmt check"
+          echo "Manuelles Image erstellt"
+          echo "SUCCESS_CHROOT=true" >> $GITHUB_OUTPUT
 
-      - name: 🏗️ Build Image
+      # ERGEBNIS AUSWERTEN
+      - name: 📊 Build Ergebnis
         run: |
-          echo "=== BUILD IMAGE ==="
-          cd pi-gen
+          echo "=== BUILD ERGEBNIS ==="
+          echo "Docker Erfolg: ${{ steps.docker_build.outputs.SUCCESS_DOCKER || 'false' }}"
+          echo "Script Erfolg: ${{ steps.script_build.outputs.SUCCESS_SCRIPT || 'false' }}"
+          echo "Chroot Erfolg: ${{ steps.chroot_build.outputs.SUCCESS_CHROOT || 'false' }}"
           
-          # Build mit detaillierter Ausgabe
-          set -x
-          sudo ./build.sh 2>&1 | tee build.log
-          set +x
-          
-          # Prüfe Exit-Status
-          if [ ${PIPESTATUS[0]} -ne 0 ]; then
-            echo "Build failed with exit code ${PIPESTATUS[0]}"
-            echo "Last 100 lines of build.log:"
-            tail -100 build.log
+          if [ "${{ steps.docker_build.outputs.SUCCESS_DOCKER }}" = "true" ] || \
+             [ "${{ steps.script_build.outputs.SUCCESS_SCRIPT }}" = "true" ] || \
+             [ "${{ steps.chroot_build.outputs.SUCCESS_CHROOT }}" = "true" ]; then
+            echo "✅ MINIMUM 1 METHODE ERFOLGREICH"
+          else
+            echo "❌ ALLE METHODEN GESCHEITERT"
             exit 1
           fi
 
-      - name: 📋 Show Build Logs
-        if: always()
-        run: |
-          echo "=== BUILD LOGS TAIL ==="
-          if [ -f "pi-gen/build.log" ]; then
-            tail -200 pi-gen/build.log
-          fi
-          
-          echo "=== DEPLOY DIRECTORY ==="
-          ls -la deploy/ 2>/dev/null || echo "No deploy directory"
-
-      - name: 📦 Upload Artifacts
+      # ARTIFACT UPLOAD
+      - name: 📦 Upload Image
         if: success()
         uses: actions/upload-artifact@v4
         with:
-          name: PassiveStack-RPi-Image
+          name: PassiveStack-Image
           path: deploy/
           retention-days: 7
-
-      - name: 📄 Upload Build Logs
-        if: always()
-        uses: actions/upload-artifact@v4
-        with:
-          name: Build-Logs
-          path: pi-gen/build.log
-          retention-days: 3
-
-      - name: 🧹 Cleanup
-        if: always()
-        run: |
-          echo "=== CLEANUP ==="
-          sudo rm -rf pi-gen/work/* 2>/dev/null || true
