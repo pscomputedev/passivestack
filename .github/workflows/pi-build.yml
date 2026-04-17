@@ -25,60 +25,90 @@ jobs:
         submodules: recursive
         fetch-depth: 0
 
-    - name: 🛠️ Setup pi-gen
+    - name: 🛠️ Setup pi-gen Dependencies
       run: |
-        echo "📦 Installiere Abhängigkeiten..."
+        echo "📦 Installiere Abhängigkeiten für Ubuntu 24.04..."
         sudo apt-get update
         sudo apt-get install -y \
           coreutils quilt parted qemu-user-static debootstrap zerofree zip \
-          dosfstools bsdtar libcap2-bin grep rsync xz-utils file git curl bc \
+          dosfstools libarchive-tools libcap2-bin grep rsync xz-utils file git curl bc \
           qemu-utils kpartx pigz
-    
+        
+        echo "✅ Abhängigkeiten installiert"
+        echo "📊 Paketversionen:"
+        which bsdtar || which bsdtar3 || echo "bsdtar nicht gefunden"
+        which arch-test || echo "arch-test nicht gefunden"
+        dpkg -l | grep -E "(libarchive|qemu|debootstrap)"
+
     - name: 🔧 Configure pi-gen
       run: |
         echo "⚙️ Konfiguriere pi-gen..."
         cd pi-gen
         git checkout bullseye
         
-        echo "📝 Schreibe config..."
-        cat > config << EOF
-        IMG_NAME=PassiveStack-v1.3
-        RELEASE=bullseye
-        DEPLOY_ZIP=0
-        DEPLOY_DIR="../$DEPLOY_DIR"
-        LOCALE_DEFAULT=en_US.UTF-8
-        TARGET_HOSTNAME=passivestack
-        KEYBOARD_KEYMAP=de
-        KEYBOARD_LAYOUT="German"
-        TIMEZONE_DEFAULT=Europe/Berlin
-        ENABLE_SSH=1
-        PUBKEY_ONLY_SSH=0
-        SSH_ENABLE_ROOT=0
-        USE_QCOW2=0
-        COMPRESS_DISK=1
-        IMG_SUFFIX=$IMG_SUFFIX
-        RPI_BOOT_FIRMWARE_VERSIONS=$RPI_BOOT_FIRMWARE_VERSIONS
-        SKIP_IMAGES=$SKIP_IMAGES
-        NOOBS=$NOOBS
-        SKIP_NOOBS=$SKIP_NOOBS
-        STAGE_LIST="stage0 stage1 stage2 stage3"
-        EOF
+        echo "📝 Erstelle config Datei..."
+        cat > config << 'EOF'
+IMG_NAME=PassiveStack-v1.3
+RELEASE=bullseye
+DEPLOY_ZIP=0
+DEPLOY_DIR="../deploy"
+LOCALE_DEFAULT=en_US.UTF-8
+TARGET_HOSTNAME=passivestack
+KEYBOARD_KEYMAP=de
+KEYBOARD_LAYOUT="German"
+TIMEZONE_DEFAULT=Europe/Berlin
+ENABLE_SSH=1
+PUBKEY_ONLY_SSH=0
+SSH_ENABLE_ROOT=0
+USE_QCOW2=0
+COMPRESS_DISK=1
+IMG_SUFFIX=-PassiveStack-v1.3
+RPI_BOOT_FIRMWARE_VERSIONS=v8
+SKIP_IMAGES=1
+NOOBS=0
+SKIP_NOOBS=1
+STAGE_LIST="stage0 stage1 stage2 stage3"
+EOF
         
         echo "📄 Config-Inhalt:"
         cat config
         
         echo "📁 Prüfe Stage-Verzeichnisse..."
         ls -la stage3/
+        
+        echo "🔧 Setze Berechtigungen..."
+        sudo chmod +x build.sh
+        sudo chmod +x stage*/prerun.sh stage*/run.sh stage*/postrun.sh 2>/dev/null || true
 
     - name: 🏗️ Build Image
       run: |
         echo "🚀 Starte Build-Prozess..."
         cd pi-gen
-        sudo ./build.sh
         
-        echo "✅ Build abgeschlossen!"
-        echo "📁 Resultate:"
-        ls -la "$DEPLOY_DIR"/
+        # Teste Build-Skript
+        echo "🔍 Teste Build-Skript..."
+        if [ ! -f "./build.sh" ]; then
+          echo "❌ build.sh nicht gefunden!"
+          exit 1
+        fi
+        
+        # Starte Build mit Logging
+        echo "📝 Build-Log wird geschrieben..."
+        sudo ./build.sh 2>&1 | tee build.log
+        
+        BUILD_RESULT=${PIPESTATUS[0]}
+        if [ $BUILD_RESULT -eq 0 ]; then
+          echo "✅ Build erfolgreich!"
+          echo "📦 Erstellte Dateien:"
+          ls -la ../deploy/
+          echo "📊 Image-Info:"
+          file ../deploy/*.img 2>/dev/null || echo "Keine .img Datei gefunden"
+        else
+          echo "❌ Build fehlgeschlagen mit Code: $BUILD_RESULT"
+          echo "📋 Letzte 50 Zeilen des Logs:"
+          tail -50 build.log
+          exit 1
+        fi
 
     - name: 📦 Upload Image Artifact
       if: success()
@@ -98,6 +128,7 @@ jobs:
       with:
         name: Build-Logs
         path: |
+          pi-gen/build.log
           pi-gen/logs/
           pi-gen/debug/
         if-no-files-found: warn
@@ -107,6 +138,7 @@ jobs:
       if: always()
       run: |
         echo "🧹 Säubere Workspace..."
-        sudo rm -rf pi-gen/work/*
-        sudo rm -rf pi-gen/deploy/*
+        sudo rm -rf pi-gen/work/* 2>/dev/null || true
+        sudo rm -f pi-gen/build.log 2>/dev/null || true
         df -h
+        echo "✅ Aufräumen abgeschlossen"
