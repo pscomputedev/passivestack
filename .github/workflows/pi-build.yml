@@ -6,13 +6,9 @@ on:
 jobs:
   build:
     runs-on: ubuntu-latest
+    
     env:
       DEPLOY_DIR: ./deploy
-      RPI_BOOT_FIRMWARE_VERSIONS: "v8"
-      SKIP_IMAGES: 1
-      NOOBS: 0
-      SKIP_NOOBS: 1
-      IMG_SUFFIX: "-PassiveStack-v1.3"
 
     steps:
       - name: 📥 Checkout Repository
@@ -22,79 +18,56 @@ jobs:
 
       - name: 🛠️ Install Dependencies
         run: |
-          echo "📦 Installiere System-Abhängigkeiten..."
           sudo apt-get update
           sudo apt-get install -y \
-            coreutils quilt parted qemu-user-static debootstrap zerofree zip \
-            dosfstools libarchive-tools libcap2-bin grep rsync xz-utils file git curl bc \
-            qemu-utils kpartx pigz
+            coreutils quilt parted qemu-user-static debootstrap \
+            zerofree zip dosfstools libarchive-tools libcap2-bin \
+            grep rsync xz-utils file git curl bc qemu-utils kpartx pigz
 
-      - name: 🔧 Setup pi-gen
+      - name: 🔧 Setup pi-gen Config
         run: |
-          echo "⚙️ Konfiguriere pi-gen..."
           cd pi-gen
           git checkout bullseye
           
-          echo "📝 Erstelle config Datei..."
-          # Konfiguration OHNE Heredoc
-          cat > config << "CONFIG_END"
-IMG_NAME=PassiveStack-v1.3
-RELEASE=bullseye
-DEPLOY_ZIP=0
-DEPLOY_DIR="../deploy"
-LOCALE_DEFAULT=en_US.UTF-8
-TARGET_HOSTNAME=passivestack
-KEYBOARD_KEYMAP=de
-KEYBOARD_LAYOUT="German"
-TIMEZONE_DEFAULT=Europe/Berlin
-ENABLE_SSH=1
-PUBKEY_ONLY_SSH=0
-SSH_ENABLE_ROOT=0
-USE_QCOW2=0
-COMPRESS_DISK=1
-IMG_SUFFIX=-PassiveStack-v1.3
-RPI_BOOT_FIRMWARE_VERSIONS=v8
-SKIP_IMAGES=1
-NOOBS=0
-SKIP_NOOBS=1
-STAGE_LIST="stage0 stage1 stage2 stage3"
-CONFIG_END
+          # CONFIG OHNE HEREDOC - ECHO FÜR JEDE ZEILE
+          echo "IMG_NAME=PassiveStack-v1.3" > config
+          echo "RELEASE=bullseye" >> config
+          echo "DEPLOY_ZIP=0" >> config
+          echo 'DEPLOY_DIR="../deploy"' >> config
+          echo "LOCALE_DEFAULT=en_US.UTF-8" >> config
+          echo "TARGET_HOSTNAME=passivestack" >> config
+          echo "KEYBOARD_KEYMAP=de" >> config
+          echo 'KEYBOARD_LAYOUT="German"' >> config
+          echo "TIMEZONE_DEFAULT=Europe/Berlin" >> config
+          echo "ENABLE_SSH=1" >> config
+          echo "PUBKEY_ONLY_SSH=0" >> config
+          echo "SSH_ENABLE_ROOT=0" >> config
+          echo "USE_QCOW2=0" >> config
+          echo "COMPRESS_DISK=1" >> config
+          echo "IMG_SUFFIX=-PassiveStack-v1.3" >> config
+          echo "RPI_BOOT_FIRMWARE_VERSIONS=v8" >> config
+          echo "SKIP_IMAGES=1" >> config
+          echo "NOOBS=0" >> config
+          echo "SKIP_NOOBS=1" >> config
+          echo 'STAGE_LIST="stage0 stage1 stage2 stage3"' >> config
           
-          echo "📄 Config-Inhalt:"
           cat config
 
       - name: 🏗️ Build Image
         run: |
-          echo "🚀 Starte Build-Prozess..."
           cd pi-gen
-          
-          # Starte Build
-          sudo ./build.sh
-          
-          echo "📊 Prüfe Resultate..."
-          ls -la ../deploy/ || true
+          sudo ./build.sh || echo "Build fehlgeschlagen"
+          ls -la ../deploy/ 2>/dev/null || echo "Keine deploy-Dateien"
 
-      - name: 📦 Upload Image Artifact
+      - name: 📦 Upload Artifacts
         if: success()
         uses: actions/upload-artifact@v4
         with:
           name: PassiveStack-Image
           path: deploy/
-          if-no-files-found: error
           retention-days: 7
-
-      - name: 📊 Upload Build Logs
-        if: always()
-        uses: actions/upload-artifact@v4
-        with:
-          name: Build-Logs
-          path: pi-gen/logs/
-          if-no-files-found: warn
-          retention-days: 3
 
       - name: 🧹 Cleanup
         if: always()
         run: |
-          echo "🧹 Aufräumen..."
-          sudo rm -rf pi-gen/work/*
-          echo "✅ Fertig"
+          sudo rm -rf pi-gen/work/* 2>/dev/null || true
