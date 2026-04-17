@@ -15,28 +15,28 @@ jobs:
       IMG_SUFFIX: "-PassiveStack-v1.3"
 
     steps:
-    - name: 📥 Checkout Repository
-      uses: actions/checkout@v4
-      with:
-        submodules: recursive
+      - name: 📥 Checkout Repository
+        uses: actions/checkout@v4
+        with:
+          submodules: recursive
 
-    - name: 🛠️ Install Dependencies
-      run: |
-        echo "📦 Installiere System-Abhängigkeiten..."
-        sudo apt-get update
-        sudo apt-get install -y \
-          coreutils quilt parted qemu-user-static debootstrap zerofree zip \
-          dosfstools libarchive-tools libcap2-bin grep rsync xz-utils file git curl bc \
-          qemu-utils kpartx pigz
+      - name: 🛠️ Install Dependencies
+        run: |
+          echo "📦 Installiere System-Abhängigkeiten..."
+          sudo apt-get update
+          sudo apt-get install -y \
+            coreutils quilt parted qemu-user-static debootstrap zerofree zip \
+            dosfstools libarchive-tools libcap2-bin grep rsync xz-utils file git curl bc \
+            qemu-utils kpartx pigz
 
-    - name: 🔧 Setup pi-gen
-      run: |
-        echo "⚙️ Konfiguriere pi-gen..."
-        cd pi-gen
-        git checkout bullseye
-        
-        echo "📝 Erstelle config Datei..."
-        cat > config << 'EOF'
+      - name: 🔧 Setup pi-gen
+        run: |
+          echo "⚙️ Konfiguriere pi-gen..."
+          cd pi-gen
+          git checkout bullseye
+          
+          echo "📝 Erstelle config Datei..."
+          cat > config << 'EOF'
 IMG_NAME=PassiveStack-v1.3
 RELEASE=bullseye
 DEPLOY_ZIP=0
@@ -58,48 +58,42 @@ NOOBS=0
 SKIP_NOOBS=1
 STAGE_LIST="stage0 stage1 stage2 stage3"
 EOF
-        
-        echo "📄 Config-Inhalt:"
-        cat config
+          
+          echo "📄 Config-Inhalt:"
+          cat config
 
-    - name: 🏗️ Build Image
-      run: |
-        echo "🚀 Starte Build-Prozess..."
-        cd pi-gen
-        
-        # Starte Build
-        sudo ./build.sh
-        
-        echo "📊 Prüfe Resultate..."
-        if [ -f "../deploy/*.img" ]; then
-          echo "✅ Image erfolgreich erstellt!"
-          ls -la ../deploy/
-        else
-          echo "⚠️ Keine .img Datei gefunden, prüfe Logs..."
+      - name: 🏗️ Build Image
+        run: |
+          echo "🚀 Starte Build-Prozess..."
+          cd pi-gen
+          
+          # Starte Build
+          sudo ./build.sh
+          
+          echo "📊 Prüfe Resultate..."
           ls -la ../deploy/ || true
-        fi
 
-    - name: 📦 Upload Image Artifact
-      if: success()
-      uses: actions/upload-artifact@v4
-      with:
-        name: PassiveStack-Image
-        path: deploy/
-        if-no-files-found: error
-        retention-days: 7
+      - name: 📦 Upload Image Artifact
+        if: success()
+        uses: actions/upload-artifact@v4
+        with:
+          name: PassiveStack-Image
+          path: deploy/
+          if-no-files-found: error
+          retention-days: 7
 
-    - name: 📊 Upload Build Logs
-      if: always()
-      uses: actions/upload-artifact@v4
-      with:
-        name: Build-Logs
-        path: pi-gen/logs/
-        if-no-files-found: warn
-        retention-days: 3
+      - name: 📊 Upload Build Logs
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: Build-Logs
+          path: pi-gen/logs/
+          if-no-files-found: warn
+          retention-days: 3
 
-    - name: 🧹 Cleanup
-      if: always()
-      run: |
-        echo "🧹 Aufräumen..."
-        sudo rm -rf pi-gen/work/*
-        echo "✅ Fertig"
+      - name: 🧹 Cleanup
+        if: always()
+        run: |
+          echo "🧹 Aufräumen..."
+          sudo rm -rf pi-gen/work/*
+          echo "✅ Fertig"
