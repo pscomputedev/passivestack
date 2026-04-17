@@ -7,9 +7,10 @@ jobs:
   build:
     runs-on: ubuntu-latest
     
+    # Node.js 24 forcen um Warnung zu beheben
     env:
-      DEPLOY_DIR: ./deploy
-
+      FORCE_JAVASCRIPT_ACTIONS_TO_NODE24: true
+    
     steps:
       - name: 📥 Checkout Repository
         uses: actions/checkout@v4
@@ -18,18 +19,25 @@ jobs:
 
       - name: 🛠️ Install Dependencies
         run: |
+          echo "=== INSTALL DEPENDENCIES ==="
           sudo apt-get update
           sudo apt-get install -y \
             coreutils quilt parted qemu-user-static debootstrap \
             zerofree zip dosfstools libarchive-tools libcap2-bin \
-            grep rsync xz-utils file git curl bc qemu-utils kpartx pigz
+            grep rsync xz-utils file git curl bc qemu-utils kpartx pigz \
+            xxd
+          
+          # QEMU static binaries setup
+          sudo update-binfmts --enable qemu-arm
+          sudo update-binfmts --enable qemu-aarch64
 
-      - name: 🔧 Setup pi-gen Config
+      - name: 🔧 Setup pi-gen
         run: |
+          echo "=== SETUP PI-GEN ==="
           cd pi-gen
           git checkout bullseye
           
-          # CONFIG OHNE HEREDOC - ECHO FÜR JEDE ZEILE
+          # Config ohne Heredoc
           echo "IMG_NAME=PassiveStack-v1.3" > config
           echo "RELEASE=bullseye" >> config
           echo "DEPLOY_ZIP=0" >> config
@@ -51,15 +59,76 @@ jobs:
           echo "SKIP_NOOBS=1" >> config
           echo 'STAGE_LIST="stage0 stage1 stage2 stage3"' >> config
           
+          echo "=== CONFIG INHALT ==="
           cat config
+          
+          echo "=== PI-GEN STATUS ==="
+          ls -la
 
-      - name: 🏗️ Build Image
+      - name: 🔍 Pre-Build Checks
         run: |
+          echo "=== PRE-BUILD CHECKS ==="
           cd pi-gen
-          sudo ./build.sh || echo "Build fehlgeschlagen"
-          ls -la ../deploy/ 2>/dev/null || echo "Keine deploy-Dateien"
+          
+          # Prüfe ob build.sh ausführbar ist
+          ls -la build.sh
+          
+          # Prüfe Verzeichnisstruktur
+          echo "Stage directories:"
+          ls -d stage* || echo "No stage directories"
+          
+          # Prüfe ob als root/sudo möglich
+          echo "Current user: $(whoami)"
+          echo "Sudo test:"
+          sudo echo "Sudo works!" || echo "Sudo problem"
 
-      - name: 📦 Upload Artifacts
+      - name: 🏗️ Build Image (mit Debug)
+        run: |
+          echo "=== START BUILD ==="
+          cd pi-gen
+          
+          # Build mit maximalem Logging
+          set -x  # Zeigt jeden Befehl
+          
+          # Versuche verschiedene Build-Methoden
+          echo "Method 1: Direct sudo build.sh"
+          sudo ./build.sh 2>&1 | tee build.log || {
+            echo "Build failed, checking logs..."
+            tail -50 build.log || true
+            echo "Trying alternative method..."
+          }
+          
+          # Alternative: Prüfe ob Docker nötig
+          echo "Checking for Docker method..."
+          if [ -f Dockerfile ]; then
+            echo "Dockerfile found, trying Docker build..."
+            docker build -t pi-gen . || echo "Docker build failed"
+          fi
+          
+          set +x
+
+      - name: 📋 Build Logs anzeigen
+        if: always()
+        run: |
+          echo "=== BUILD LOGS ==="
+          cd pi-gen
+          
+          # Letzte 100 Zeilen der Logs
+          if [ -f build.log ]; then
+            tail -100 build.log
+          fi
+          
+          # Falls vorhanden: stage logs
+          if [ -d logs ]; then
+            echo "=== STAGE LOGS ==="
+            find logs -name "*.log" -exec tail -50 {} \;
+          fi
+          
+          # Prüfe ob deploy existiert
+          echo "=== DEPLOY DIRECTORY ==="
+          ls -la ../deploy/ 2>/dev/null || echo "No deploy directory"
+
+      - name: 📦 Upload Artifacts (wenn erfolgreich)
         if: success()
         uses: actions/upload-artifact@v4
         with:
@@ -67,7 +136,19 @@ jobs:
           path: deploy/
           retention-days: 7
 
+      - name: 📄 Upload Build Logs
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: Build-Debug-Logs
+          path: |
+            pi-gen/build.log
+            pi-gen/logs/
+          retention-days: 3
+
       - name: 🧹 Cleanup
         if: always()
         run: |
+          echo "=== CLEANUP ==="
           sudo rm -rf pi-gen/work/* 2>/dev/null || true
+          echo "Cleanup complete"
