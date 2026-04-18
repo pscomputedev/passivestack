@@ -1,20 +1,186 @@
 {
-  "global": {
-    "domain": "passivestack.local",
-    "email": "krauskopf.fotografie@gmail.com",
-    "timezone": "Europe/Berlin",
-    "local_ip": "192.168.178.36"
+  "traefik": {
+    "enabled": true,
+    "image": "traefik:v3.1",
+    "container_name": "traefik",
+    "restart": "unless-stopped",
+    "security_opt": ["no-new-privileges:true"],
+    "networks": ["proxy"],
+    "ports": ["80:80", "443:443"],
+    "volumes": [
+      "/var/run/docker.sock:/var/run/docker.sock:ro",
+      "./traefik:/etc/traefik",
+      "./data/traefik/acme.json:/acme.json"
+    ],
+    "environment": {
+      "TZ": "${TIMEZONE:-Europe/Berlin}"
+    }
   },
-  "apps": {
-    "traefik": {
-      "enabled": true,
-      "dashboard": true
+  "homepage": {
+    "enabled": true,
+    "image": "ghcr.io/gethomepage/homepage:latest",
+    "container_name": "homepage",
+    "restart": "unless-stopped",
+    "networks": ["proxy"],
+    "volumes": ["./config:/app/config"],
+    "environment": {
+      "TZ": "${TIMEZONE:-Europe/Berlin}"
     },
-    "portainer": {
-      "enabled": true
+    "labels": {
+      "traefik.enable": "true",
+      "traefik.http.routers.homepage.rule": "PathPrefix(`/`)",
+      "traefik.http.routers.homepage.entrypoints": "websecure",
+      "traefik.http.routers.homepage.tls.certresolver": "letsencrypt"
+    }
+  },
+  "portainer": {
+    "enabled": true,
+    "image": "portainer/portainer-ce:latest",
+    "container_name": "portainer",
+    "restart": "unless-stopped",
+    "networks": ["proxy"],
+    "volumes": [
+      "/var/run/docker.sock:/var/run/docker.sock",
+      "./data/portainer:/data"
+    ],
+    "environment": {
+      "TZ": "${TIMEZONE:-Europe/Berlin}"
     },
-    "watchtower": {
-      "enabled": true
+    "labels": {
+      "traefik.enable": "true",
+      "traefik.http.routers.portainer.rule": "PathPrefix(`/portainer`)",
+      "traefik.http.routers.portainer.entrypoints": "websecure",
+      "traefik.http.routers.portainer.tls.certresolver": "letsencrypt",
+      "traefik.http.services.portainer.loadbalancer.server.port": "9000"
+    }
+  },
+  "watchtower": {
+    "enabled": true,
+    "image": "containrrr/watchtower:latest",
+    "container_name": "watchtower",
+    "restart": "unless-stopped",
+    "volumes": ["/var/run/docker.sock:/var/run/docker.sock"],
+    "environment": {
+      "WATCHTOWER_CLEANUP": "true",
+      "WATCHTOWER_POLL_INTERVAL": "7200",
+      "TZ": "${TIMEZONE:-Europe/Berlin}"
+    },
+    "labels": {
+      "com.centurylinklabs.watchtower.enable": "true"
+    }
+  },
+  "grass": {
+    "enabled": false,
+    "image": "mrcolorrain/grass-node:latest",
+    "container_name": "grass",
+    "restart": "unless-stopped",
+    "hostname": "grass-node",
+    "environment": {
+      "USER_EMAIL": "",
+      "USER_PASSWORD": "",
+      "DEVICE_NAME": "passivestack"
+    },
+    "volumes": ["./data/grass:/data"]
+  },
+  "honeygain": {
+    "enabled": false,
+    "image": "honeygain/honeygain:latest",
+    "container_name": "honeygain",
+    "restart": "unless-stopped",
+    "command": "-tou-accept -email ${HONEYGAIN_EMAIL} -pass ${HONEYGAIN_PASSWORD} -device ${DEVICE_NAME:-passivestack}",
+    "environment": {
+      "HONEYGAIN_EMAIL": "",
+      "HONEYGAIN_PASSWORD": "",
+      "DEVICE_NAME": "passivestack"
+    }
+  },
+  "earnapp": {
+    "enabled": false,
+    "image": "fazalfarooq/earnapp:latest",
+    "container_name": "earnapp",
+    "restart": "unless-stopped",
+    "environment": {
+      "EARNAPP_TOKEN": ""
+    },
+    "volumes": ["./data/earnapp:/app/data"]
+  },
+  "iproyal": {
+    "enabled": false,
+    "image": "iproyal/pawns-cli:latest",
+    "container_name": "iproyal",
+    "restart": "unless-stopped",
+    "environment": {
+      "IPROYAL_EMAIL": "",
+      "IPROYAL_PASSWORD": "",
+      "IPROYAL_DEVICE_NAME": "passivestack"
+    }
+  },
+  "pawns": {
+    "enabled": false,
+    "image": "pawnsapp/pawns-cli:latest",
+    "container_name": "pawns",
+    "restart": "unless-stopped",
+    "environment": {
+      "PAWNS_EMAIL": "",
+      "PAWNS_PASSWORD": "",
+      "PAWNS_DEVICE_NAME": "passivestack"
+    }
+  },
+  "repocket": {
+    "enabled": false,
+    "image": "repocket/repocket:latest",
+    "container_name": "repocket",
+    "restart": "unless-stopped",
+    "environment": {
+      "REPOCKET_EMAIL": "",
+      "REPOCKET_API_KEY": ""
+    },
+    "volumes": ["./data/repocket:/data"]
+  },
+  "traffmonetizer": {
+    "enabled": false,
+    "image": "traffmonetizer/cli:latest",
+    "container_name": "traffmonetizer",
+    "restart": "unless-stopped",
+    "command": "start accept --token ${TRAFFMONETIZER_TOKEN}"
+  },
+  "packetstream": {
+    "enabled": false,
+    "image": "packetstream/psclient:latest",
+    "container_name": "packetstream",
+    "restart": "unless-stopped",
+    "environment": {
+      "CID": ""
+    }
+  },
+  "myst": {
+    "enabled": false,
+    "image": "myst/myst:latest",
+    "container_name": "myst",
+    "restart": "unless-stopped",
+    "environment": {
+      "MYST_WALLET": ""
+    },
+    "ports": ["4449:4449"]
+  },
+  "bitping": {
+    "enabled": false,
+    "image": "bitping/bitping-node:latest",
+    "container_name": "bitping",
+    "restart": "unless-stopped",
+    "environment": {
+      "BITPING_TOKEN": "",
+      "BITPING_DEVICE_NAME": "passivestack"
+    },
+    "volumes": ["./data/bitping:/data"]
+  },
+  "earnfm": {
+    "enabled": false,
+    "image": "earnfm/earnfm-client:latest",
+    "container_name": "earnfm",
+    "restart": "unless-stopped",
+    "environment": {
+      "EARNFM_TOKEN": ""
     }
   }
 }
