@@ -1,91 +1,52 @@
 {
-  "watchtower": {
-    "image": "containrrr/watchtower",
-    "volumes": ["/var/run/docker.sock:/var/run/docker.sock"],
-    "command": "--interval 3600 --cleanup"
-  },
-  "earnapp": {
-    "image": "f0rc3/earnapp:latest-amd64",
-    "volumes": ["./data/earnapp:/etc/earnapp"],
+  "_comment": "Liste aller verfügbaren Apps + Standard-Images. Diese Datei sollte nicht manuell bearbeitet werden.",
+  "_version": "1.0",
+  "pihole": {
+    "enabled": true,
+    "profile": "minimal",
+    "image": "pihole/pihole:latest",
+    "ports": [
+      "53:53/tcp",
+      "53:53/udp",
+      "8080:80/tcp"
+    ],
     "environment": {
-      "EARNAPP_UUID": ""
+      "TZ": "Europe/Berlin"
     },
-    "required_fields": ["EARNAPP_UUID"],
-    "enabled_by_default": true
+    "volumes": [
+      "./data/pihole:/etc/pihole",
+      "./data/dnsmasq:/etc/dnsmasq.d"
+    ]
   },
-  "honeygain": {
-    "image": "honeygain/honeygain",
-    "command": "-tou-accept",
-    "environment": {
-      "HG_TOKEN": ""
-    },
-    "required_fields": ["HG_TOKEN"],
-    "enabled_by_default": true
-  },
-  "iproyal": {
-    "image": "iproyal/pawns-cli",
-    "command": "-accept-tos",
-    "environment": {
-      "IPR_EMAIL": "",
-      "IPR_PASSWORD": "",
-      "DEVICE_NAME": ""
-    },
-    "required_fields": ["IPR_EMAIL", "IPR_PASSWORD", "DEVICE_NAME"]
-  },
-  "packetstream": {
-    "image": "packetstream/psclient:latest",
-    "environment": {
-      "CID": ""
-    },
-    "required_fields": ["CID"]
-  },
-  "peer2profit": {
-    "image": "peer2profit/peer2profit_linux:latest",
-    "environment": {
-      "P2P_EMAIL": ""
-    },
-    "required_fields": ["P2P_EMAIL"]
-  },
-  "traffmonetizer": {
-    "image": "traffmonetizer/client_docker:latest",
-    "environment": {
-      "TM_TOKEN": ""
-    },
-    "required_fields": ["TM_TOKEN"]
-  },
-  "repocket": {
-    "image": "repocket/repocket:latest",
-    "environment": {
-      "RP_EMAIL": "",
-      "RP_API_KEY": ""
-    },
-    "required_fields": ["RP_EMAIL", "RP_API_KEY"]
-  },
-  "earnfm": {
-    "image": "hashiz/earnfm-client",
-    "environment": {
-      "EARNFM_TOKEN": ""
-    },
-    "required_fields": ["EARNFM_TOKEN"],
-    "enabled_by_default": true
-  },
-  "bitping": {
-    "image": "bitping/bitping-node:latest",
-    "volumes": ["./data/bitping:/home/node/.bitping"],
-    "environment": {
-      "BITPING_EMAIL": "",
-      "BITPING_PASSWORD": ""
-    },
-    "required_fields": ["BITPING_EMAIL", "BITPING_PASSWORD"]
-  },
-  "mysterium": {
-    "image": "mysteriumnetwork/myst_supervisor:latest",
+  "portainer": {
+    "enabled": true,
+    "profile": "default",
+    "image": "portainer/portainer-ce:latest",
+    "ports": [
+      "9000:9000"
+    ],
     "volumes": [
       "/var/run/docker.sock:/var/run/docker.sock",
-      "./data/mysterium:/var/lib/mysterium-node"
+      "./data/portainer:/data"
+    ]
+  },
+  "plex": {
+    "enabled": false,
+    "profile": "media",
+    "image": "plexinc/pms-docker:plexpass",
+    "ports": [
+      "32400:32400/tcp"
     ],
-    "ports": ["4449:4449", "52310:52310/udp"],
-    "cap_add": ["NET_ADMIN"],
-    "restart": "unless-stopped"
+    "environment": {
+      "TZ": "Europe/Berlin",
+      "PLEX_CLAIM": "claim-XXXXXXXXXXXXXXXXXXXXXXXX",
+      "ADVERTISE_IP": "http://192.168.178.50:32400/"
+    },
+    "volumes": [
+      "./data/plex/config:/config",
+      "./media/movies:/movies",
+      "./media/series:/series"
+    ],
+    "gpu_support": true
   }
 }
