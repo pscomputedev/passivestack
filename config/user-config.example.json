@@ -1,97 +1,51 @@
 {
-  "global": {
-    "WATCHTOWER_ENABLED": true,
-    "COMPOSE_PROJECT_NAME": "passivestack"
+  "_WARNING_": "=====================================================",
+  "_WARNING_": "DIESE DATEI IST NUR EIN BEISPIEL!",
+  "_WARNING_": "Kopiere diese Datei nach 'user-config.json' und passe die Werte an.",
+  "_WARNING_": "Die Datei 'user-config.json' wird von .gitignore ignoriert und sollte NIE ins Git hochgeladen werden!",
+  "_WARNING_": "=====================================================",
+  
+  "network": {
+    "subnet": "192.168.178.0/24",
+    "gateway": "192.168.178.1",
+    "interface": "eth0",
+    "dns": ["192.168.178.1", "1.1.1.1"]
   },
-  "apps": {
-    "earnapp": {
-      "EARNAPP_UUID": "YOUR_EARNAPP_UUID"
+  
+  "services": {
+    "homepage": {
+      "enabled": true,
+      "port": 3000,
+      "name": "Homepage"
     },
-    "honeygain": {
-      "HG_TOKEN": "YOUR_HONEYGAIN_TOKEN"
+    "portainer": {
+      "enabled": true,
+      "port": 9000,
+      "name": "Portainer"
     },
-    "iproyal": {
-      "IPR_EMAIL": "your@email.com",
-      "IPR_PASSWORD": "yourpassword",
-      "DEVICE_NAME": "PassiveStackNode"
+    "watchtower": {
+      "enabled": true,
+      "schedule": "0 4 * * *"
     },
-    "packetstream": {
-      "CID": "YOUR_PACKETSTREAM_CID"
-    },
-    "peer2profit": {
-      "P2P_EMAIL": "your@email.com"
-    },
-    "traffmonetizer": {
-      "TM_TOKEN": "YOUR_TRAFFMONETIZER_TOKEN"
-    },
-    "repocket": {
-      "RP_EMAIL": "your@email.com",
-      "RP_API_KEY": "YOUR_REPOCKET_API_KEY"
-    },
-    "earnfm": {
-      "EARNFM_TOKEN": "YOUR_EARNFM_TOKEN"
-    },
-    "bitping": {
-      "BITPING_EMAIL": "your@email.com",
-      "BITPING_PASSWORD": "yourpassword"
-    },
-    "mysterium": {
-      "ENABLED": true
-    }
-  }
-}
-{
-  "_comment": "PassiveStack User-Konfiguration (Template). Kopiere diese Datei zu 'user-config.json' und passe sie an.",
-  "_version": "1.2",
-  "global": {
-    "data_dir": "./data",
-    "timezone": "Europe/Berlin"
-  },
-  "apps": {
-    "earnapp": {
-      "EARNAPP_UUID": "dein-earnapp-uuid-hier"
-    },
-    "honeygain": {
-      "HONEYGAIN_EMAIL": "deine@email.de",
-      "HONEYGAIN_PASSWORD": "dein-passwort",
-      "HONEYGAIN_DEVICE": "passivestack-pi"
-    },
-    "iproyal": {
-      "IPROYAL_EMAIL": "deine@email.de",
-      "IPROYAL_PASSWORD": "dein-passwort",
-      "IPROYAL_DEVICE": "passivestack-pi",
-      "IPROYAL_DEVICE_ID": "auto"
-    },
-    "packetstream": {
-      "CID": "dein-packetstream-cid"
-    },
-    "peer2profit": {
-      "P2P_EMAIL": "deine@email.de"
-    },
-    "traffmonetizer": {
-      "TRAFFMONETIZER_TOKEN": "dein-traffmonetizer-token"
-    },
-    "repocket": {
-      "RP_EMAIL": "deine@email.de",
-      "RP_API_KEY": "dein-repocket-api-key"
-    },
-    "earnfm": {
-      "EARNFM_TOKEN": "dein-earnfm-token"
-    },
-    "bitping": {
-      "BITPING_EMAIL": "deine@email.de",
-      "BITPING_PASSWORD": "dein-passwort"
-    },
-    "mysterium": {
-      "MYSTERYM_ENABLED": "true"
+    "fail2ban": {
+      "enabled": true
     }
   },
-  "overrides": {
-    "peer2profit": {
-      "enabled": false
-    },
-    "packetstream": {
-      "enabled": false
-    }
-  }
+  
+  "storage": {
+    "base_path": "/opt/passivestack",
+    "data_path": "/opt/passivestack/data"
+  },
+  
+  "security": {
+    "timezone": "Europe/Berlin",
+    "log_level": "info",
+    "auto_update": true
+  },
+  
+  "notes": [
+    "Ändere alle Passwörter und Ports nach deinen Wünschen.",
+    "Der Ordner 'data/' wird von .gitignore ignoriert.",
+    "Nach dem Anpassen diese Datei in 'user-config.json' umbenennen."
+  ]
 }
