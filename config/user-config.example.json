@@ -1,0 +1,55 @@
+{
+  "_comment": "PassiveStack User-Konfiguration (Template). Kopiere diese Datei zu 'user-config.json' und passe sie an.",
+  "_version": "1.2",
+  "global": {
+    "data_dir": "./data",
+    "timezone": "Europe/Berlin"
+  },
+  "apps": {
+    "earnapp": {
+      "EARNAPP_UUID": "dein-earnapp-uuid-hier"
+    },
+    "honeygain": {
+      "HONEYGAIN_EMAIL": "deine@email.de",
+      "HONEYGAIN_PASSWORD": "dein-passwort",
+      "HONEYGAIN_DEVICE": "passivestack-pi"
+    },
+    "iproyal": {
+      "IPROYAL_EMAIL": "deine@email.de",
+      "IPROYAL_PASSWORD": "dein-passwort",
+      "IPROYAL_DEVICE": "passivestack-pi",
+      "IPROYAL_DEVICE_ID": "auto"
+    },
+    "packetstream": {
+      "CID": "dein-packetstream-cid"
+    },
+    "peer2profit": {
+      "P2P_EMAIL": "deine@email.de"
+    },
+    "traffmonetizer": {
+      "TRAFFMONETIZER_TOKEN": "dein-traffmonetizer-token"
+    },
+    "repocket": {
+      "RP_EMAIL": "deine@email.de",
+      "RP_API_KEY": "dein-repocket-api-key"
+    },
+    "earnfm": {
+      "EARNFM_TOKEN": "dein-earnfm-token"
+    },
+    "bitping": {
+      "BITPING_EMAIL": "deine@email.de",
+      "BITPING_PASSWORD": "dein-passwort"
+    },
+    "mysterium": {
+      "MYSTERYM_ENABLED": "true"
+    }
+  },
+  "overrides": {
+    "peer2profit": {
+      "enabled": false
+    },
+    "packetstream": {
+      "enabled": false
+    }
+  }
+}
