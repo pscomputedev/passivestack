@@ -1,54 +1,20 @@
 {
-  "_comment": "PassiveStack User-Konfiguration – Passe deine Zugangsdaten an. Leere Felder = Service wird deaktiviert",
-  "_version": "2.0",
   "global": {
-    "data_dir": "./data",
+    "domain": "passivestack.local",
+    "email": "krauskopf.fotografie@gmail.com",
     "timezone": "Europe/Berlin",
-    "domain": "yourdomain.com",
-    "email": "your@email.com",
-    "local_ip": "192.168.178.50"
-  },
-  "watchtower": {
-    "enabled": true
+    "local_ip": "192.168.178.36"
   },
   "apps": {
-    "grass": {
-      "email": "",
-      "password": ""
+    "traefik": {
+      "enabled": true,
+      "dashboard": true
     },
-    "honeygain": {
-      "email": "",
-      "password": "",
-      "device": "passivestack-pi"
+    "portainer": {
+      "enabled": true
     },
-    "earnapp": {
-      "token": ""
-    },
-    "iproyal": {
-      "email": "",
-      "password": "",
-      "device": "passivestack-pi",
-      "device_id": "auto"
-    },
-    "repocket": {
-      "email": "",
-      "api_key": ""
-    },
-    "traffmonetizer": {
-      "token": ""
-    },
-    "packetstream": {
-      "cid": ""
-    },
-    "earnfm": {
-      "token": ""
-    },
-    "bitping": {
-      "email": "",
-      "password": ""
-    },
-    "mysterium": {
-      "api_key": ""
+    "watchtower": {
+      "enabled": true
     }
   }
 }
