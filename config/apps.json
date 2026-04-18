@@ -62,14 +62,14 @@
     }
   },
   "grass": {
-    "enabled": false,
+    "enabled": true,
     "image": "mrcolorrain/grass-node:latest",
     "container_name": "grass",
     "restart": "unless-stopped",
     "hostname": "grass-node",
     "environment": {
-      "USER_EMAIL": "",
-      "USER_PASSWORD": "",
+      "USER_EMAIL": "${GRASS_EMAIL:-}",
+      "USER_PASSWORD": "${GRASS_PASSWORD:-}",
       "DEVICE_NAME": "passivestack"
     },
     "volumes": ["./data/grass:/data"]
