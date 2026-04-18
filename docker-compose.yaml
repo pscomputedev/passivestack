@@ -2,42 +2,122 @@ version: "3.9"
 
 services:
   traefik:
-    image: traefik:v3.1
+    image: traefik:v3.0
     container_name: traefik
     restart: unless-stopped
     ports:
       - "80:80"
-      - "443:443"
-    networks:
-      - proxy
+      - "8080:8080"
     volumes:
       - /var/run/docker.sock:/var/run/docker.sock:ro
-      - ${DATA_DIR}/traefik:/traefik
-    environment:
-      - TZ=${TZ}
-      - DOMAIN=${DOMAIN}
-      - EMAIL=${EMAIL}
-    labels:
-      - "traefik.enable=true"
-      - "traefik.http.routers.traefik.rule=Host(`traefik.${DOMAIN}`)"
-      - "traefik.http.routers.traefik.service=api@internal"
-      - "traefik.http.routers.traefik.tls.certresolver=letsencrypt"
-    command:
-      - --api.insecure=false
-      - --providers.docker=true
-      - --providers.docker.exposedbydefault=false
-      - --entrypoints.websecure.address=:443
-      - --entrypoints.web.address=:80
-      - --entrypoints.web.http.redirections.entrypoint.to=websecure
-      - --certificatesresolvers.letsencrypt.acme.email=${EMAIL}
-      - --certificatesresolvers.letsencrypt.acme.storage=/traefik/acme.json
-      - --certificatesresolvers.letsencrypt.acme.httpchallenge=true
-      - --certificatesresolvers.letsencrypt.acme.httpchallenge.entrypoint=web
+      - ./config/traefik:/etc/traefik
+    networks:
+      - passivestack
 
-  # Weitere Services werden später hinzugefügt (Portainer, Watchtower, etc.)
+  portainer:
+    image: portainer/portainer-ce:latest
+    container_name: portainer
+    restart: unless-stopped
+    ports:
+      - "9000:9000"
+    volumes:
+      - portainer_data:/data
+      - /var/run/docker.sock:/var/run/docker.sock
+    networks:
+      - passivestack
+
+  watchtower:
+    image: containrrr/watchtower:latest
+    container_name: watchtower
+    restart: unless-stopped
+    volumes:
+      - /var/run/docker.sock:/var/run/docker.sock
+    environment:
+      - WATCHTOWER_CLEANUP=true
+      - WATCHTOWER_SCHEDULE=0 0 * * *
+    networks:
+      - passivestack
+
+  honeygain:
+    image: honeygain/honeygain:latest
+    container_name: honeygain
+    restart: unless-stopped
+    environment:
+      - HONEYGAIN_EMAIL=${HONEYGAIN_EMAIL}
+      - HONEYGAIN_PASSWORD=${HONEYGAIN_PASSWORD}
+    networks:
+      - passivestack
+
+  iproyal:
+    image: iproyal/pawns-cli:latest
+    container_name: iproyal
+    restart: unless-stopped
+    environment:
+      - IPROYAL_EMAIL=${IPROYAL_EMAIL}
+      - IPROYAL_PASSWORD=${IPROYAL_PASSWORD}
+      - IPROYAL_DEVICE=passivestack-pi
+    networks:
+      - passivestack
+
+  pawns:
+    image: frooodle/pawns-app:latest
+    container_name: pawns
+    restart: unless-stopped
+    environment:
+      - PAWNS_EMAIL=${PAWNS_EMAIL}
+      - PAWNS_PASSWORD=${PAWNS_PASSWORD}
+    networks:
+      - passivestack
+
+  repocket:
+    image: repocket/repocket:latest
+    container_name: repocket
+    restart: unless-stopped
+    environment:
+      - RP_EMAIL=${RP_EMAIL}
+      - RP_API_KEY=${RP_API_KEY}
+    networks:
+      - passivestack
+
+  traffmonetizer:
+    image: traffmonetizer/cli:latest
+    container_name: traffmonetizer
+    restart: unless-stopped
+    command: start accept --token ${TRAFFMONETIZER_TOKEN}
+    networks:
+      - passivestack
+
+  packetstream:
+    image: packetstream/psnode:latest
+    container_name: packetstream
+    restart: unless-stopped
+    environment:
+      - CID=${PACKETSTREAM_CID}
+    networks:
+      - passivestack
+
+  myst:
+    image: mysteriumnetwork/myst:latest
+    container_name: myst
+    restart: unless-stopped
+    command: service --agreed-terms-consent
+    environment:
+      - MYST_WATCHTOWER=true
+    networks:
+      - passivestack
+
+  earnfm:
+    image: earnfm/earnfmd:latest
+    container_name: earnfm
+    restart: unless-stopped
+    environment:
+      - EARNFM_TOKEN=${EARNFM_TOKEN}
+    networks:
+      - passivestack
 
 networks:
-  proxy:
-    name: proxy
+  passivestack:
     driver: bridge
-    external: false
+
+volumes:
+  portainer_data:
