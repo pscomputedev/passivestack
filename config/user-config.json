@@ -8,14 +8,16 @@
   },
   "honeygain": {
     "email": "",
-    "password": ""
+    "password": "",
+    "device": "passivestack-pi"
   },
   "earnapp": {
     "token": ""
   },
   "iproyal": {
     "email": "",
-    "password": ""
+    "password": "",
+    "device": "passivestack-pi"
   },
   "repocket": {
     "email": "",
@@ -26,5 +28,15 @@
   },
   "packetstream": {
     "cid": ""
+  },
+  "earnfm": {
+    "token": ""
+  },
+  "bitping": {
+    "email": "",
+    "password": ""
+  },
+  "mysterium": {
+    "api_key": ""
   }
 }
