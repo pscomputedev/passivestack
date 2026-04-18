@@ -1,136 +1,203 @@
 {
+  "_comment": "PassiveStack App-Definitionen. User-spezifische Daten (Tokens, Emails) NICHT hier eintragen - dafür user-config.json verwenden!",
+  "_version": "1.3",
   "apps": {
     "earnapp": {
-      "image": "farukt/docker-earnapp:latest",
+      "image": "fazalfarhan01/earnapp:lite",
+      "description": "EarnApp by BrightData - Bandbreite teilen",
+      "architecture": "multiarch",
+      "enabled_by_default": true,
       "restart": "unless-stopped",
+      "network_mode": "host",
+      "privileged": false,
       "environment": {
-        "EARNAPP_UUID": "",
-        "EARNAPP_EMAIL": "",
-        "EARNAPP_REFCODE": ""
+        "EARNAPP_UUID": ""
       },
       "volumes": [
-        "./data/earnapp:/app/data"
+        "./data/earnapp:/etc/earnapp"
       ],
-      "network_mode": "host",
-      "privileged": false
+      "required_fields": ["EARNAPP_UUID"],
+      "signup_url": "https://earnapp.com/i/referral"
     },
+
     "honeygain": {
       "image": "honeygain/honeygain:latest",
+      "description": "Honeygain - Bandbreite teilen",
+      "architecture": "amd64",
+      "enabled_by_default": true,
       "restart": "unless-stopped",
-      "environment": {
-        "EMAIL": "",
-        "PASS": ""
-      },
+      "network_mode": "host",
+      "privileged": false,
+      "command": "-tou-accept -email ${HONEYGAIN_EMAIL} -pass ${HONEYGAIN_PASSWORD} -device ${HONEYGAIN_DEVICE}",
+      "environment": {},
       "volumes": [
         "./data/honeygain:/app/data"
       ],
-      "network_mode": "host",
-      "privileged": false
+      "required_fields": ["HONEYGAIN_EMAIL", "HONEYGAIN_PASSWORD", "HONEYGAIN_DEVICE"],
+      "signup_url": "https://r.honeygain.me/"
     },
+
     "iproyal": {
       "image": "iproyal/pawns-cli:latest",
+      "description": "IPRoyal Pawns - Bandbreite teilen",
+      "architecture": "multiarch",
+      "enabled_by_default": true,
       "restart": "unless-stopped",
-      "environment": {
-        "EMAIL": "",
-        "PASSWORD": ""
-      },
+      "network_mode": "host",
+      "privileged": false,
+      "command": "-email=${IPROYAL_EMAIL} -password=${IPROYAL_PASSWORD} -device-name=${IPROYAL_DEVICE} -device-id=${IPROYAL_DEVICE_ID} -accept-tos",
+      "environment": {},
       "volumes": [
         "./data/iproyal:/app/data"
       ],
-      "network_mode": "host",
-      "privileged": false
+      "required_fields": ["IPROYAL_EMAIL", "IPROYAL_PASSWORD", "IPROYAL_DEVICE", "IPROYAL_DEVICE_ID"],
+      "signup_url": "https://iproyal.com/pawns/"
     },
+
     "packetstream": {
       "image": "packetstream/psclient:latest",
+      "description": "PacketStream - Bandbreite teilen (AMD64 Emulation)",
+      "architecture": "amd64",
+      "enabled_by_default": false,
       "restart": "unless-stopped",
+      "network_mode": "host",
+      "privileged": false,
       "environment": {
         "CID": ""
       },
       "volumes": [
         "./data/packetstream:/app/data"
       ],
-      "network_mode": "host",
-      "privileged": false
+      "required_fields": ["CID"],
+      "signup_url": "https://packetstream.io/?psr=xxx"
     },
+
     "peer2profit": {
       "image": "peer2profit/peer2profit_x86_64:latest",
+      "description": "Peer2Profit - Bandbreite teilen (AMD64 Only, instabil auf ARM)",
+      "architecture": "amd64",
+      "enabled_by_default": false,
       "restart": "unless-stopped",
+      "network_mode": "host",
+      "privileged": false,
       "environment": {
-        "EMAIL": ""
+        "P2P_EMAIL": ""
       },
       "volumes": [
         "./data/peer2profit:/app/data"
       ],
-      "network_mode": "host",
-      "privileged": false
+      "required_fields": ["P2P_EMAIL"],
+      "signup_url": "https://p2pr.me/"
     },
+
     "traffmonetizer": {
       "image": "traffmonetizer/cli_v2:latest",
+      "description": "TraffMonetizer - Bandbreite teilen",
+      "architecture": "multiarch",
+      "enabled_by_default": true,
       "restart": "unless-stopped",
-      "environment": {
-        "TOKEN": ""
-      },
+      "network_mode": "host",
+      "privileged": false,
+      "command": "start accept --token ${TRAFFMONETIZER_TOKEN}",
+      "environment": {},
       "volumes": [
         "./data/traffmonetizer:/app/data"
       ],
-      "network_mode": "host",
-      "privileged": false
+      "required_fields": ["TRAFFMONETIZER_TOKEN"],
+      "signup_url": "https://traffmonetizer.com/?aff=xxx"
     },
+
     "repocket": {
-      "image": "repocket/repocket-node:latest",
+      "image": "repocket/repocket:latest",
+      "description": "Repocket - Bandbreite teilen",
+      "architecture": "multiarch",
+      "enabled_by_default": true,
       "restart": "unless-stopped",
+      "network_mode": "host",
+      "privileged": false,
       "environment": {
-        "EMAIL": "",
-        "API_KEY": ""
+        "RP_EMAIL": "",
+        "RP_API_KEY": ""
       },
       "volumes": [
         "./data/repocket:/app/data"
       ],
-      "network_mode": "host",
-      "privileged": false
+      "required_fields": ["RP_EMAIL", "RP_API_KEY"],
+      "signup_url": "https://link.repocket.com/xxx"
     },
-    "earnfish": {
-      "image": "earnfish/earnfish:latest",
+
+    "earnfm": {
+      "image": "earnfm/earnfm-client:latest",
+      "description": "Earn.fm - Bandbreite teilen",
+      "architecture": "multiarch",
+      "enabled_by_default": true,
       "restart": "unless-stopped",
+      "network_mode": "host",
+      "privileged": false,
       "environment": {
-        "TOKEN": ""
+        "EARNFM_TOKEN": ""
       },
       "volumes": [
-        "./data/earnfish:/app/data"
+        "./data/earnfm:/app/data"
       ],
-      "network_mode": "host",
-      "privileged": false
+      "required_fields": ["EARNFM_TOKEN"],
+      "signup_url": "https://earn.fm/ref/xxx"
     },
+
     "bitping": {
-      "image": "bitping/node:latest",
+      "image": "bitping/bitpingd:latest",
+      "description": "Bitping - Netzwerk-Tests, zahlt in BTC",
+      "architecture": "multiarch",
+      "enabled_by_default": true,
       "restart": "unless-stopped",
-      "environment": {
-        "EMAIL": "",
-        "PASSWORD": "",
-        "MFA_CODE": ""
-      },
-      "volumes": [
-        "./data/bitping:/app/data"
-      ],
       "network_mode": "host",
-      "privileged": false
+      "privileged": false,
+      "environment": {},
+      "volumes": [
+        "./data/bitping:/root/.bitpingd"
+      ],
+      "required_fields": [],
+      "setup_command": "docker run --rm -it -v $(pwd)/data/bitping:/root/.bitpingd bitping/bitpingd:latest bitpingd login",
+      "signup_url": "https://app.bitping.com/register"
     },
+
     "mysterium": {
       "image": "mysteriumnetwork/myst:latest",
+      "description": "Mysterium Network - VPN-Node, zahlt in MYST Token",
+      "architecture": "multiarch",
+      "enabled_by_default": false,
       "restart": "unless-stopped",
-      "environment": {
-        "IDENTITY_PASSWORD": ""
-      },
+      "network_mode": "host",
+      "privileged": true,
+      "cap_add": ["NET_ADMIN"],
+      "devices": ["/dev/net/tun"],
+      "environment": {},
+      "command": "service --agreed-terms-and-conditions",
       "volumes": [
         "./data/mysterium:/var/lib/mysterium-node"
       ],
-      "network_mode": "host",
-      "ports": [
-        "4449:4449"
+      "required_fields": [],
+      "signup_url": "https://mystnodes.com/"
+    },
+
+    "watchtower": {
+      "image": "containrrr/watchtower:latest",
+      "description": "Watchtower - Automatische Container-Updates",
+      "architecture": "multiarch",
+      "enabled_by_default": true,
+      "restart": "unless-stopped",
+      "network_mode": "bridge",
+      "privileged": false,
+      "environment": {
+        "WATCHTOWER_CLEANUP": "true",
+        "WATCHTOWER_SCHEDULE": "0 0 4 * * *",
+        "WATCHTOWER_INCLUDE_RESTARTING": "true"
+      },
+      "volumes": [
+        "/var/run/docker.sock:/var/run/docker.sock"
       ],
-      "cap_add": ["NET_ADMIN"],
-      "privileged": true,
-      "devices": ["/dev/net/tun"]
+      "required_fields": [],
+      "is_system": true
     }
   }
 }
