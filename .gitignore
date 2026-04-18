@@ -1,23 +1,39 @@
-# Env Dateien
+# =============================================
+# PassiveStack – Sicherheitsrelevante Dateien
+# =============================================
+
+# WICHTIG: Diese Dateien dürfen NIE ins Git!
 .env
 .env.local
 .env.*.local
+user-config.json
+config/user-config.json
 
-# Datenverzeichnisse
-/data/**
-/config/user-config.json
+# Generierte Dateien
+docker-compose.yaml
+docker-compose.yml
+compose.yaml
+config/user-config.example.json   # falls wir eine Beispiel-Datei im config-Ordner haben
+
+# Daten & Media (können groß werden oder sensible Infos enthalten)
+data/
+.media/
+media/
+.data/
 
 # Logs
 *.log
-logs/*
+logs/
+*.log.*
 
 # Temporäre Dateien
 tmp/
 temp/
 *.tmp
 *.temp
+generated/
 
-# Python Cache
+# Python Cache & Build Artefakte
 __pycache__/
 *.py[cod]
 *$py.class
@@ -36,15 +52,18 @@ sdist/
 var/
 wheels/
 pip-wheel-metadata/
+*.egg-info/
 
-# IDEs
+# IDEs und Editoren
 .vscode/
 .idea/
 *.swp
 *.swo
 *~
+.project
+.pydevproject
 
-# OS generated files
+# OS generierte Dateien
 .DS_Store
 .DS_Store?
 ._*
@@ -54,11 +73,13 @@ ehthumbs.db
 Thumbs.db
 
 # Docker
-docker-compose.override.yml
 .dockerignore
+docker-compose.override.yml
 
 # Sonstiges
 node_modules/
 coverage/
 .coverage
 *.bak
+*.backup
+dashboard/.config/app-config.json
