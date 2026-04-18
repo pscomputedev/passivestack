@@ -1,223 +1,174 @@
 #!/usr/bin/env python3
 import json
-import sys
+import os
 from pathlib import Path
 
-def load_config():
-    config_file = Path("config/user-config.json")
-    if not config_file.exists():
-        print("Fehler: config/user-config.json nicht gefunden!")
-        print("Bitte erstelle diese Datei zuerst mit deinen Einstellungen.")
-        sys.exit(1)
-    
-    try:
-        with open(config_file, "r", encoding="utf-8") as f:
-            return json.load(f)
-    except json.JSONDecodeError as e:
-        print(f"Fehler in user-config.json: {e}")
-        sys.exit(1)
-    except Exception as e:
-        print(f"Fehler beim Lesen der Config: {e}")
-        sys.exit(1)
+# ===================== CONFIG =====================
+CONFIG_FILE = Path("config/user-config.json")
+OUTPUT_FILE = Path("docker-compose.yml")
 
-def main():
-    config = load_config()
-    
-    domain = config.get("domain", "example.com")
-    email = config.get("email", "your@email.com")
-    timezone = config.get("timezone", "Europe/Berlin")
-    
-    services = config.get("services", {})
-    
-    compose = {
-        "version": "3.8",
-        "networks": {
-            "proxy": {
-                "external": True
-            }
-        },
-        "services": {}
-    }
-    
-    # Traefik
-    compose["services"]["traefik"] = {
-        "image": "traefik:v3.0",
-        "container_name": "traefik",
-        "restart": "unless-stopped",
-        "ports": ["80:80", "443:443"],
-        "volumes": [
-            "/var/run/docker.sock:/var/run/docker.sock:ro",
-            "./traefik/traefik.yml:/traefik.yml:ro",
-            "./data/traefik/acme.json:/acme.json",
-            "./traefik:/etc/traefik"
-        ],
-        "networks": ["proxy"],
-        "environment": [
-            f"TZ={timezone}"
-        ]
-    }
-    
-    # Portainer
-    if services.get("portainer", True):
-        compose["services"]["portainer"] = {
-            "image": "portainer/portainer-ce:latest",
-            "container_name": "portainer",
-            "restart": "unless-stopped",
-            "volumes": [
-                "/var/run/docker.sock:/var/run/docker.sock",
-                "./data/portainer:/data"
-            ],
-            "networks": ["proxy"],
-            "labels": [
-                "traefik.enable=true",
-                f"traefik.http.routers.portainer.rule=Host(`portainer.{domain}`)",
-                "traefik.http.routers.portainer.entrypoints=websecure",
-                "traefik.http.routers.portainer.tls.certresolver=letsencrypt",
-                "traefik.http.services.portainer.loadbalancer.server.port=9000"
-            ],
-            "environment": [
-                f"TZ={timezone}"
-            ]
-        }
-    
-    # EarnApp
-    if services.get("earnapp", True):
-        earnapp_token = services.get("earnapp", {}).get("token", "")
-        if earnapp_token:
-            compose["services"]["earnapp"] = {
-                "image": "fazalfarhan01/earnapp:latest",
-                "container_name": "earnapp",
-                "restart": "unless-stopped",
-                "networks": ["proxy"],
-                "environment": [
-                    f"TOKEN={earnapp_token}",
-                    f"TZ={timezone}"
-                ],
-                "labels": [
-                    "traefik.enable=true",
-                    f"traefik.http.routers.earnapp.rule=Host(`earnapp.{domain}`)",
-                    "traefik.http.routers.earnapp.entrypoints=websecure",
-                    "traefik.http.routers.earnapp.tls.certresolver=letsencrypt",
-                    "traefik.http.services.earnapp.loadbalancer.server.port=80"
-                ]
-            }
-    
-    # Repocket
-    if services.get("repocket", True):
-        repocket_token = services.get("repocket", {}).get("token", "")
-        if repocket_token:
-            compose["services"]["repocket"] = {
-                "image": "ghcr.io/repocket/repocket:latest",
-                "container_name": "repocket",
-                "restart": "unless-stopped",
-                "networks": ["proxy"],
-                "environment": [
-                    f"REPOCKET_TOKEN={repocket_token}",
-                    f"TZ={timezone}"
-                ],
-                "labels": [
-                    "traefik.enable=true",
-                    f"traefik.http.routers.repocket.rule=Host(`repocket.{domain}`)",
-                    "traefik.http.routers.repocket.entrypoints=websecure",
-                    "traefik.http.routers.repocket.tls.certresolver=letsencrypt",
-                    "traefik.http.services.repocket.loadbalancer.server.port=80"
-                ]
-            }
-    
-    # docker-compose.yml schreiben
-    output_file = Path("docker-compose.yml")
-    with open(output_file, "w", encoding="utf-8") as f:
-        # Manuelles YAML schreiben für bessere Kontrolle im GitHub-Editor
-        f.write('version: "3.8"\n\n')
-        f.write('networks:\n')
-        f.write('  proxy:\n')
-        f.write('    external: true\n\n')
-        f.write('services:\n')
-        
-        # Traefik
-        f.write('  traefik:\n')
-        f.write('    image: traefik:v3.0\n')
-        f.write('    container_name: traefik\n')
-        f.write('    restart: unless-stopped\n')
-        f.write('    ports:\n')
-        f.write('      - "80:80"\n')
-        f.write('      - "443:443"\n')
-        f.write('    volumes:\n')
-        f.write('      - /var/run/docker.sock:/var/run/docker.sock:ro\n')
-        f.write('      - ./traefik/traefik.yml:/traefik.yml:ro\n')
-        f.write('      - ./data/traefik/acme.json:/acme.json\n')
-        f.write('      - ./traefik:/etc/traefik\n')
-        f.write('    networks:\n')
-        f.write('      - proxy\n')
-        f.write(f'    environment:\n')
-        f.write(f'      - TZ={timezone}\n\n')
-        
-        # Portainer
-        if services.get("portainer", True):
-            f.write('  portainer:\n')
-            f.write('    image: portainer/portainer-ce:latest\n')
-            f.write('    container_name: portainer\n')
-            f.write('    restart: unless-stopped\n')
-            f.write('    volumes:\n')
-            f.write('      - /var/run/docker.sock:/var/run/docker.sock\n')
-            f.write('      - ./data/portainer:/data\n')
-            f.write('    networks:\n')
-            f.write('      - proxy\n')
-            f.write('    labels:\n')
-            f.write('      - traefik.enable=true\n')
-            f.write(f'      - traefik.http.routers.portainer.rule=Host(`portainer.{domain}`)\n')
-            f.write('      - traefik.http.routers.portainer.entrypoints=websecure\n')
-            f.write('      - traefik.http.routers.portainer.tls.certresolver=letsencrypt\n')
-            f.write('      - traefik.http.services.portainer.loadbalancer.server.port=9000\n')
-            f.write(f'    environment:\n')
-            f.write(f'      - TZ={timezone}\n\n')
-        
-        # EarnApp
-        if services.get("earnapp", True):
-            earnapp_token = services.get("earnapp", {}).get("token", "")
-            if earnapp_token:
-                f.write('  earnapp:\n')
-                f.write('    image: fazalfarhan01/earnapp:latest\n')
-                f.write('    container_name: earnapp\n')
-                f.write('    restart: unless-stopped\n')
-                f.write('    networks:\n')
-                f.write('      - proxy\n')
-                f.write('    environment:\n')
-                f.write(f'      - TOKEN={earnapp_token}\n')
-                f.write(f'      - TZ={timezone}\n')
-                f.write('    labels:\n')
-                f.write('      - traefik.enable=true\n')
-                f.write(f'      - traefik.http.routers.earnapp.rule=Host(`earnapp.{domain}`)\n')
-                f.write('      - traefik.http.routers.earnapp.entrypoints=websecure\n')
-                f.write('      - traefik.http.routers.earnapp.tls.certresolver=letsencrypt\n')
-                f.write('      - traefik.http.services.earnapp.loadbalancer.server.port=80\n\n')
-        
-        # Repocket
-        if services.get("repocket", True):
-            repocket_token = services.get("repocket", {}).get("token", "")
-            if repocket_token:
-                f.write('  repocket:\n')
-                f.write('    image: ghcr.io/repocket/repocket:latest\n')
-                f.write('    container_name: repocket\n')
-                f.write('    restart: unless-stopped\n')
-                f.write('    networks:\n')
-                f.write('      - proxy\n')
-                f.write('    environment:\n')
-                f.write(f'      - REPOCKET_TOKEN={repocket_token}\n')
-                f.write(f'      - TZ={timezone}\n')
-                f.write('    labels:\n')
-                f.write('      - traefik.enable=true\n')
-                f.write(f'      - traefik.http.routers.repocket.rule=Host(`repocket.{domain}`)\n')
-                f.write('      - traefik.http.routers.repocket.entrypoints=websecure\n')
-                f.write('      - traefik.http.routers.repocket.tls.certresolver=letsencrypt\n')
-                f.write('      - traefik.http.services.repocket.loadbalancer.server.port=80\n')
-    
-    print("✅ docker-compose.yml wurde erfolgreich generiert!")
-    print(f"   Domain: {domain}")
-    print("   Enthaltene Services: Traefik + " + 
-          ("Portainer, " if services.get("portainer", True) else "") +
-          ("EarnApp, " if services.get("earnapp", {}).get("token") else "") +
-          ("Repocket" if services.get("repocket", {}).get("token") else ""))
+# ===================== LOAD CONFIG =====================
+if not CONFIG_FILE.exists():
+    print(f"Fehler: {CONFIG_FILE} nicht gefunden!")
+    exit(1)
 
-if __name__ == "__main__":
-    main()
+with open(CONFIG_FILE, "r") as f:
+    config = json.load(f)
+
+global_cfg = config.get("global", {})
+apps = config.get("apps", {})
+
+# ===================== HELPER FUNCTIONS =====================
+def env(var_name: str, value):
+    if value is None or value == "":
+        return ""
+    return f'      - {var_name}={value}'
+
+def service_header(name: str, image: str, restart: str = "unless-stopped"):
+    return f"""  {name}:
+    image: {image}
+    container_name: {name}
+    restart: {restart}
+    network_mode: bridge
+"""
+
+# ===================== START COMPOSE =====================
+compose = f"""version: '3.8'
+
+services:
+  traefik:
+    image: traefik:v3.0
+    container_name: traefik
+    restart: unless-stopped
+    network_mode: bridge
+    ports:
+      - "80:80"
+      - "443:443"
+    volumes:
+      - /var/run/docker.sock:/var/run/docker.sock:ro
+      - ./data/traefik:/letsencrypt
+    environment:
+      - TZ={global_cfg.get('timezone', 'Europe/Berlin')}
+    command:
+      - --api.insecure=true
+      - --providers.docker=true
+      - --providers.docker.exposedbydefault=false
+      - --entrypoints.websecure.address=:443
+      - --certificatesresolvers.myresolver.acme.tlschallenge=true
+      - --certificatesresolvers.myresolver.acme.email={global_cfg.get('email', 'your@email.com')}
+      - --certificatesresolvers.myresolver.acme.storage=/letsencrypt/acme.json
+"""
+
+# Watchtower
+if config.get("watchtower", {}).get("enabled", True):
+    compose += """
+  watchtower:
+    image: containrrr/watchtower:latest
+    container_name: watchtower
+    restart: unless-stopped
+    volumes:
+      - /var/run/docker.sock:/var/run/docker.sock
+    environment:
+      - TZ={timezone}
+      - WATCHTOWER_CLEANUP=true
+      - WATCHTOWER_SCHEDULE=0 3 * * *
+""".format(timezone=global_cfg.get('timezone', 'Europe/Berlin'))
+
+# ===================== SERVICES =====================
+
+# Grass
+if apps.get("grass", {}).get("email"):
+    g = apps["grass"]
+    compose += service_header("grass", "grasscloud/cloud-node:latest")
+    compose += f"""    environment:
+{env('GRASS_EMAIL', g.get('email'))}
+{env('GRASS_PASSWORD', g.get('password'))}
+    volumes:
+      - ./data/grass:/data
+"""
+
+# Honeygain
+if apps.get("honeygain", {}).get("email"):
+    h = apps["honeygain"]
+    compose += service_header("honeygain", "honeygain/honeygain:latest")
+    compose += f"""    environment:
+{env('HONEYGAIN_EMAIL', h.get('email'))}
+{env('HONEYGAIN_PASSWORD', h.get('password'))}
+{env('HONEYGAIN_DEVICE', h.get('device', 'passivestack-pi'))}
+    cap_add:
+      - NET_ADMIN
+"""
+
+# EarnApp
+if apps.get("earnapp", {}).get("token"):
+    compose += service_header("earnapp", "fazalfarhan01/earnapp:latest")
+    compose += f"""    environment:
+{env('EARNAPP_TOKEN', apps['earnapp'].get('token'))}
+    volumes:
+      - ./data/earnapp:/app
+"""
+
+# IPRoyal
+if apps.get("iproyal", {}).get("email") and apps.get("iproyal", {}).get("password"):
+    i = apps["iproyal"]
+    compose += service_header("iproyal", "iproyal/pawns-cli:latest")
+    compose += f"""    environment:
+{env('IPROYAL_EMAIL', i.get('email'))}
+{env('IPROYAL_PASSWORD', i.get('password'))}
+{env('IPROYAL_DEVICE', i.get('device', 'passivestack-pi'))}
+{env('IPROYAL_DEVICE_ID', i.get('device_id', 'auto'))}
+"""
+
+# Repocket
+if apps.get("repocket", {}).get("api_key"):
+    compose += service_header("repocket", "repocket/repocket:latest")
+    compose += f"""    environment:
+{env('REPOCKET_API_KEY', apps['repocket'].get('api_key'))}
+{env('REPOCKET_EMAIL', apps['repocket'].get('email'))}
+"""
+
+# Traffmonetizer
+if apps.get("traffmonetizer", {}).get("token"):
+    compose += service_header("traffmonetizer", "traffmonetizer/traffmonetizer:latest")
+    compose += f"""    command: start accept --token {apps['traffmonetizer'].get('token')}
+"""
+
+# Packetstream
+if apps.get("packetstream", {}).get("cid"):
+    compose += service_header("packetstream", "packetstream/psnode:latest")
+    compose += f"""    environment:
+{env('CID', apps['packetstream'].get('cid'))}
+"""
+
+# EarnFM
+if apps.get("earnfm", {}).get("token"):
+    compose += service_header("earnfm", "earnfm/earnfm-client:latest")
+    compose += f"""    environment:
+{env('EARNFM_TOKEN', apps['earnfm'].get('token'))}
+"""
+
+# Bitping
+if apps.get("bitping", {}).get("email") and apps.get("bitping", {}).get("password"):
+    b = apps["bitping"]
+    compose += service_header("bitping", "bitping/node:latest")
+    compose += f"""    environment:
+{env('BITPING_EMAIL', b.get('email'))}
+{env('BITPING_PASSWORD', b.get('password'))}
+"""
+
+# Mysterium
+if apps.get("mysterium", {}).get("api_key"):
+    compose += service_header("mysterium", "mysteriumnetwork/myst:latest")
+    compose += f"""    environment:
+{env('MYSTERIUM_API_KEY', apps['mysterium'].get('api_key'))}
+    volumes:
+      - ./data/mysterium:/var/lib/mysterium-node
+"""
+
+# ===================== WRITE FILE =====================
+with open(OUTPUT_FILE, "w") as f:
+    f.write(compose)
+
+print("✅ docker-compose.yml wurde erfolgreich generiert!")
+print(f"   Konfiguration basiert auf: {CONFIG_FILE}")
+print(f"   Aktivierte Services: {len([k for k,v in apps.items() if v and any(v.values())])}")
