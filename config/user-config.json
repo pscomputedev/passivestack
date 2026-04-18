@@ -1,69 +1,30 @@
 {
-  "_CRITICAL_WARNING_": "=====================================================",
-  "_CRITICAL_WARNING_": "ACHTUNG: DIESE DATEI ENTHÄLT DEINE PERSÖNLICHEN DATEN!",
-  "_CRITICAL_WARNING_": "Sie wird von .gitignore ignoriert und darf NIE ins Git oder in die Öffentlichkeit gelangen!",
-  "_CRITICAL_WARNING_": "=====================================================",
-  
-  "network": {
-    "subnet": "192.168.178.0/24",
-    "gateway": "192.168.178.1",
-    "interface": "eth0",
-    "dns": ["192.168.178.1", "1.1.1.1"]
+  "timezone": "Europe/Berlin",
+  "domain": "yourdomain.com",
+  "email": "your@email.com",
+  "grass": {
+    "email": "",
+    "password": ""
   },
-  
-  "services": {
-    "homepage": {
-      "enabled": true,
-      "port": 3000,
-      "name": "Homepage",
-      "description": "Deine zentrale Übersichtsseite"
-    },
-    "portainer": {
-      "enabled": true,
-      "port": 9000,
-      "name": "Portainer",
-      "description": "Docker Management Interface"
-    },
-    "watchtower": {
-      "enabled": true,
-      "schedule": "0 4 * * *",
-      "notification_email": "deine-email@beispiel.de"
-    },
-    "fail2ban": {
-      "enabled": true,
-      "bantime": "24h"
-    },
-    "traefik": {
-      "enabled": true,
-      "http_port": 80,
-      "https_port": 443
-    }
+  "honeygain": {
+    "email": "",
+    "password": ""
   },
-  
-  "storage": {
-    "base_path": "/opt/passivestack",
-    "data_path": "/opt/passivestack/data",
-    "media_path": "/opt/passivestack/media"
+  "earnapp": {
+    "token": ""
   },
-  
-  "security": {
-    "timezone": "Europe/Berlin",
-    "log_level": "info",
-    "auto_update": true,
-    "admin_email": "deine-email@beispiel.de"
+  "iproyal": {
+    "email": "",
+    "password": ""
   },
-  
-  "custom": {
-    "domain": "deine-domain.duckdns.org",
-    "duckdns_token": "DEIN_DUCKDNS_TOKEN_HIER_EINFÜGEN",
-    "portainer_password_hash": "DEIN_HASHED_PASSWORT_HIER"
+  "repocket": {
+    "email": "",
+    "api_key": ""
   },
-  
-  "_IMPORTANT_NOTES_": [
-    "1. ÄNDERE ALLE WERTE, BESONDERS PASSWÖRTER UND TOKENS!",
-    "2. Diese Datei wird von install.sh und den Docker-Compose-Dateien eingelesen.",
-    "3. Nach Änderungen immer den Stack neu starten.",
-    "4. Niemals diese Datei committen oder teilen!",
-    "5. Für echte Passwörter und Tokens die .env Datei zusätzlich anpassen."
-  ]
+  "traffmonetizer": {
+    "token": ""
+  },
+  "packetstream": {
+    "cid": ""
+  }
 }
