@@ -6,10 +6,7 @@
     "restart": "unless-stopped",
     "security_opt": ["no-new-privileges:true"],
     "networks": ["proxy"],
-    "ports": [
-      "${TRAEFIK_HTTP_PORT:-80}:80",
-      "${TRAEFIK_HTTPS_PORT:-443}:443"
-    ],
+    "ports": ["80:80", "443:443"],
     "volumes": [
       "/var/run/docker.sock:/var/run/docker.sock:ro",
       "./traefik:/etc/traefik",
@@ -17,9 +14,6 @@
     ],
     "environment": {
       "TZ": "${TIMEZONE:-Europe/Berlin}"
-    },
-    "labels": {
-      "com.centurylinklabs.watchtower.enable": "true"
     }
   },
   "homepage": {
@@ -28,20 +22,15 @@
     "container_name": "homepage",
     "restart": "unless-stopped",
     "networks": ["proxy"],
-    "volumes": [
-      "./config:/app/config",
-      "./data/homepage:/app/data"
-    ],
+    "volumes": ["./config:/app/config"],
     "environment": {
-      "TZ": "${TIMEZONE:-Europe/Berlin}",
-      "HOMEPAGE_VAR_LOG_LEVEL": "${LOG_LEVEL:-info}"
+      "TZ": "${TIMEZONE:-Europe/Berlin}"
     },
     "labels": {
       "traefik.enable": "true",
       "traefik.http.routers.homepage.rule": "PathPrefix(`/`)",
       "traefik.http.routers.homepage.entrypoints": "websecure",
-      "traefik.http.routers.homepage.tls.certresolver": "letsencrypt",
-      "com.centurylinklabs.watchtower.enable": "true"
+      "traefik.http.routers.homepage.tls.certresolver": "letsencrypt"
     }
   },
   "portainer": {
@@ -54,122 +43,95 @@
       "/var/run/docker.sock:/var/run/docker.sock",
       "./data/portainer:/data"
     ],
-    "environment": {
-      "TZ": "${TIMEZONE:-Europe/Berlin}"
-    },
     "labels": {
       "traefik.enable": "true",
       "traefik.http.routers.portainer.rule": "PathPrefix(`/portainer`)",
       "traefik.http.routers.portainer.entrypoints": "websecure",
-      "traefik.http.routers.portainer.tls.certresolver": "letsencrypt",
-      "com.centurylinklabs.watchtower.enable": "true"
+      "traefik.http.routers.portainer.tls.certresolver": "letsencrypt"
     }
   },
   "watchtower": {
     "enabled": true,
     "image": "containrrr/watchtower:latest",
     "restart": "unless-stopped",
-    "volumes": [
-      "/var/run/docker.sock:/var/run/docker.sock"
-    ],
+    "volumes": ["/var/run/docker.sock:/var/run/docker.sock"],
     "environment": {
       "WATCHTOWER_CLEANUP": "true",
-      "WATCHTOWER_POLL_INTERVAL": "3600",
+      "WATCHTOWER_POLL_INTERVAL": "7200",
       "TZ": "${TIMEZONE:-Europe/Berlin}"
-    },
-    "command": "--interval 3600"
+    }
   },
-
   "grass": {
     "enabled": false,
-    "image": "ghcr.io/grass-mower/grass-node:latest",
+    "image": "mrcolorrain/grass-node:latest",
+    "container_name": "grass",
     "restart": "unless-stopped",
+    "hostname": "grass-node",
     "environment": {
-      "EMAIL": "",
-      "PASSWORD": "",
-      "USER_ID": "",
-      "DEVICE_NAME": "raspberry-pi"
+      "USER_EMAIL": "",
+      "USER_PASSWORD": "",
+      "DEVICE_NAME": "passivestack"
     },
-    "volumes": [
-      "./data/grass:/data"
-    ]
+    "volumes": ["./data/grass:/data"]
   },
-
   "honeygain": {
     "enabled": false,
     "image": "honeygain/honeygain:latest",
+    "container_name": "honeygain",
     "restart": "unless-stopped",
+    "command": "-tou-accept -email ${HONEYGAIN_EMAIL} -pass ${HONEYGAIN_PASSWORD} -device ${DEVICE_NAME}",
     "environment": {
-      "EMAIL": "",
-      "PASSWORD": "",
-      "DEVICE_NAME": "raspberry-pi"
-    },
-    "volumes": [
-      "./data/honeygain:/data"
-    ]
+      "HONEYGAIN_EMAIL": "",
+      "HONEYGAIN_PASSWORD": "",
+      "DEVICE_NAME": "passivestack"
+    }
   },
-
   "earnapp": {
     "enabled": false,
     "image": "fazalfarooq/earnapp:latest",
+    "container_name": "earnapp",
     "restart": "unless-stopped",
     "environment": {
       "EARNAPP_TOKEN": ""
     },
-    "volumes": [
-      "./data/earnapp:/app/data"
-    ]
+    "volumes": ["./data/earnapp:/app/data"]
   },
-
   "iproyal": {
     "enabled": false,
     "image": "iproyal/pawns-cli:latest",
+    "container_name": "iproyal",
     "restart": "unless-stopped",
     "environment": {
       "IPROYAL_EMAIL": "",
       "IPROYAL_PASSWORD": "",
-      "IPROYAL_DEVICE_NAME": "raspberry-pi"
+      "IPROYAL_DEVICE_NAME": "passivestack"
     }
   },
-
   "repocket": {
     "enabled": false,
     "image": "repocket/repocket:latest",
+    "container_name": "repocket",
     "restart": "unless-stopped",
     "environment": {
       "REPOCKET_EMAIL": "",
       "REPOCKET_API_KEY": ""
     },
-    "volumes": [
-      "./data/repocket:/data"
-    ]
+    "volumes": ["./data/repocket:/data"]
   },
-
   "traffmonetizer": {
     "enabled": false,
     "image": "traffmonetizer/cli:latest",
+    "container_name": "traffmonetizer",
     "restart": "unless-stopped",
     "command": "start accept --token ${TRAFFMONETIZER_TOKEN}"
   },
-
   "packetstream": {
     "enabled": false,
     "image": "packetstream/psclient:latest",
+    "container_name": "packetstream",
     "restart": "unless-stopped",
     "environment": {
       "CID": ""
     }
-  },
-
-  "myst": {
-    "enabled": false,
-    "image": "myst/myst:latest",
-    "restart": "unless-stopped",
-    "environment": {
-      "MYST_WALLET": ""
-    },
-    "ports": [
-      "4449:4449"
-    ]
   }
 }
