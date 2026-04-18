@@ -1,116 +1,223 @@
 #!/usr/bin/env python3
 import json
-import os
+import sys
 from pathlib import Path
 
-# Pfade
-CONFIG_DIR = Path("config")
-APPS_FILE = CONFIG_DIR / "apps.json"
-USER_CONFIG_FILE = CONFIG_DIR / "user-config.json"
-OUTPUT_FILE = Path("docker-compose.yaml")
-
-def load_json(file_path):
-    with open(file_path, 'r', encoding='utf-8') as f:
-        return json.load(f)
+def load_config():
+    config_file = Path("config/user-config.json")
+    if not config_file.exists():
+        print("Fehler: config/user-config.json nicht gefunden!")
+        print("Bitte erstelle diese Datei zuerst mit deinen Einstellungen.")
+        sys.exit(1)
+    
+    try:
+        with open(config_file, "r", encoding="utf-8") as f:
+            return json.load(f)
+    except json.JSONDecodeError as e:
+        print(f"Fehler in user-config.json: {e}")
+        sys.exit(1)
+    except Exception as e:
+        print(f"Fehler beim Lesen der Config: {e}")
+        sys.exit(1)
 
 def main():
-    if not APPS_FILE.exists():
-        print(f"Fehler: {APPS_FILE} nicht gefunden!")
-        return 1
-    if not USER_CONFIG_FILE.exists():
-        print(f"Fehler: {USER_CONFIG_FILE} nicht gefunden!")
-        return 1
-
-    apps = load_json(APPS_FILE)
-    user_config = load_json(USER_CONFIG_FILE)
-
-    # Basis-Konfiguration
+    config = load_config()
+    
+    domain = config.get("domain", "example.com")
+    email = config.get("email", "your@email.com")
+    timezone = config.get("timezone", "Europe/Berlin")
+    
+    services = config.get("services", {})
+    
     compose = {
         "version": "3.8",
-        "services": {},
         "networks": {
             "proxy": {
-                "name": "proxy",
-                "driver": "bridge",
-                "external": False
+                "external": True
             }
         },
-        "volumes": {}
+        "services": {}
     }
-
-    # Environment-Variablen aus user-config
-    env = {
-        "TIMEZONE": user_config.get("timezone", "Europe/Berlin"),
-        "DOMAIN": user_config.get("domain", "yourdomain.com"),
-        "EMAIL": user_config.get("email", "your@email.com")
+    
+    # Traefik
+    compose["services"]["traefik"] = {
+        "image": "traefik:v3.0",
+        "container_name": "traefik",
+        "restart": "unless-stopped",
+        "ports": ["80:80", "443:443"],
+        "volumes": [
+            "/var/run/docker.sock:/var/run/docker.sock:ro",
+            "./traefik/traefik.yml:/traefik.yml:ro",
+            "./data/traefik/acme.json:/acme.json",
+            "./traefik:/etc/traefik"
+        ],
+        "networks": ["proxy"],
+        "environment": [
+            f"TZ={timezone}"
+        ]
     }
-
-    # Grass Credentials
-    if user_config.get("grass"):
-        env["GRASS_EMAIL"] = user_config["grass"].get("email", "")
-        env["GRASS_PASSWORD"] = user_config["grass"].get("password", "")
-
-    # Honeygain Credentials
-    if user_config.get("honeygain"):
-        env["HONEYGAIN_EMAIL"] = user_config["honeygain"].get("email", "")
-        env["HONEYGAIN_PASSWORD"] = user_config["honeygain"].get("password", "")
-
-    # Weitere Credentials
-    if user_config.get("earnapp"):
-        env["EARNAPP_TOKEN"] = user_config["earnapp"].get("token", "")
-    if user_config.get("iproyal"):
-        env["IPROYAL_EMAIL"] = user_config["iproyal"].get("email", "")
-        env["IPROYAL_PASSWORD"] = user_config["iproyal"].get("password", "")
-    if user_config.get("repocket"):
-        env["REPOCKET_EMAIL"] = user_config["repocket"].get("email", "")
-        env["REPOCKET_API_KEY"] = user_config["repocket"].get("api_key", "")
-    if user_config.get("traffmonetizer"):
-        env["TRAFFMONETIZER_TOKEN"] = user_config["traffmonetizer"].get("token", "")
-    if user_config.get("packetstream"):
-        env["PACKETSTREAM_CID"] = user_config["packetstream"].get("cid", "")
-
-    # Services generieren
-    for app_name, app_config in apps.items():
-        if not app_config.get("enabled", False):
-            continue
-
-        service = {
-            "image": app_config["image"],
-            "container_name": app_config.get("container_name", app_name),
-            "restart": app_config.get("restart", "unless-stopped")
+    
+    # Portainer
+    if services.get("portainer", True):
+        compose["services"]["portainer"] = {
+            "image": "portainer/portainer-ce:latest",
+            "container_name": "portainer",
+            "restart": "unless-stopped",
+            "volumes": [
+                "/var/run/docker.sock:/var/run/docker.sock",
+                "./data/portainer:/data"
+            ],
+            "networks": ["proxy"],
+            "labels": [
+                "traefik.enable=true",
+                f"traefik.http.routers.portainer.rule=Host(`portainer.{domain}`)",
+                "traefik.http.routers.portainer.entrypoints=websecure",
+                "traefik.http.routers.portainer.tls.certresolver=letsencrypt",
+                "traefik.http.services.portainer.loadbalancer.server.port=9000"
+            ],
+            "environment": [
+                f"TZ={timezone}"
+            ]
         }
-
-        if "networks" in app_config:
-            service["networks"] = app_config["networks"]
-        if "ports" in app_config:
-            service["ports"] = app_config["ports"]
-        if "volumes" in app_config:
-            service["volumes"] = app_config["volumes"]
-        if "environment" in app_config:
-            service_env = app_config["environment"].copy()
-            # Platzhalter durch echte Werte ersetzen
-            for key, value in service_env.items():
-                if isinstance(value, str) and value.startswith("${") and value.endswith("}"):
-                    var_name = value.strip("${}").split(":")[0]
-                    service_env[key] = env.get(var_name, value)
-            service["environment"] = service_env
-        if "labels" in app_config:
-            service["labels"] = app_config["labels"]
-        if "command" in app_config:
-            service["command"] = app_config["command"]
-        if "hostname" in app_config:
-            service["hostname"] = app_config["hostname"]
-
-        compose["services"][app_name] = service
-
-    # Datei schreiben
-    with open(OUTPUT_FILE, 'w', encoding='utf-8') as f:
-        json.dump(compose, f, indent=2)
-        f.write("\n")  # Zusätzlichen Zeilenumbruch für bessere Lesbarkeit
-
-    print(f"✅ docker-compose.yaml erfolgreich generiert mit {len(compose['services'])} aktiven Services.")
-    print(f"   Generierte Services: {', '.join(compose['services'].keys())}")
-    return 0
+    
+    # EarnApp
+    if services.get("earnapp", True):
+        earnapp_token = services.get("earnapp", {}).get("token", "")
+        if earnapp_token:
+            compose["services"]["earnapp"] = {
+                "image": "fazalfarhan01/earnapp:latest",
+                "container_name": "earnapp",
+                "restart": "unless-stopped",
+                "networks": ["proxy"],
+                "environment": [
+                    f"TOKEN={earnapp_token}",
+                    f"TZ={timezone}"
+                ],
+                "labels": [
+                    "traefik.enable=true",
+                    f"traefik.http.routers.earnapp.rule=Host(`earnapp.{domain}`)",
+                    "traefik.http.routers.earnapp.entrypoints=websecure",
+                    "traefik.http.routers.earnapp.tls.certresolver=letsencrypt",
+                    "traefik.http.services.earnapp.loadbalancer.server.port=80"
+                ]
+            }
+    
+    # Repocket
+    if services.get("repocket", True):
+        repocket_token = services.get("repocket", {}).get("token", "")
+        if repocket_token:
+            compose["services"]["repocket"] = {
+                "image": "ghcr.io/repocket/repocket:latest",
+                "container_name": "repocket",
+                "restart": "unless-stopped",
+                "networks": ["proxy"],
+                "environment": [
+                    f"REPOCKET_TOKEN={repocket_token}",
+                    f"TZ={timezone}"
+                ],
+                "labels": [
+                    "traefik.enable=true",
+                    f"traefik.http.routers.repocket.rule=Host(`repocket.{domain}`)",
+                    "traefik.http.routers.repocket.entrypoints=websecure",
+                    "traefik.http.routers.repocket.tls.certresolver=letsencrypt",
+                    "traefik.http.services.repocket.loadbalancer.server.port=80"
+                ]
+            }
+    
+    # docker-compose.yml schreiben
+    output_file = Path("docker-compose.yml")
+    with open(output_file, "w", encoding="utf-8") as f:
+        # Manuelles YAML schreiben für bessere Kontrolle im GitHub-Editor
+        f.write('version: "3.8"\n\n')
+        f.write('networks:\n')
+        f.write('  proxy:\n')
+        f.write('    external: true\n\n')
+        f.write('services:\n')
+        
+        # Traefik
+        f.write('  traefik:\n')
+        f.write('    image: traefik:v3.0\n')
+        f.write('    container_name: traefik\n')
+        f.write('    restart: unless-stopped\n')
+        f.write('    ports:\n')
+        f.write('      - "80:80"\n')
+        f.write('      - "443:443"\n')
+        f.write('    volumes:\n')
+        f.write('      - /var/run/docker.sock:/var/run/docker.sock:ro\n')
+        f.write('      - ./traefik/traefik.yml:/traefik.yml:ro\n')
+        f.write('      - ./data/traefik/acme.json:/acme.json\n')
+        f.write('      - ./traefik:/etc/traefik\n')
+        f.write('    networks:\n')
+        f.write('      - proxy\n')
+        f.write(f'    environment:\n')
+        f.write(f'      - TZ={timezone}\n\n')
+        
+        # Portainer
+        if services.get("portainer", True):
+            f.write('  portainer:\n')
+            f.write('    image: portainer/portainer-ce:latest\n')
+            f.write('    container_name: portainer\n')
+            f.write('    restart: unless-stopped\n')
+            f.write('    volumes:\n')
+            f.write('      - /var/run/docker.sock:/var/run/docker.sock\n')
+            f.write('      - ./data/portainer:/data\n')
+            f.write('    networks:\n')
+            f.write('      - proxy\n')
+            f.write('    labels:\n')
+            f.write('      - traefik.enable=true\n')
+            f.write(f'      - traefik.http.routers.portainer.rule=Host(`portainer.{domain}`)\n')
+            f.write('      - traefik.http.routers.portainer.entrypoints=websecure\n')
+            f.write('      - traefik.http.routers.portainer.tls.certresolver=letsencrypt\n')
+            f.write('      - traefik.http.services.portainer.loadbalancer.server.port=9000\n')
+            f.write(f'    environment:\n')
+            f.write(f'      - TZ={timezone}\n\n')
+        
+        # EarnApp
+        if services.get("earnapp", True):
+            earnapp_token = services.get("earnapp", {}).get("token", "")
+            if earnapp_token:
+                f.write('  earnapp:\n')
+                f.write('    image: fazalfarhan01/earnapp:latest\n')
+                f.write('    container_name: earnapp\n')
+                f.write('    restart: unless-stopped\n')
+                f.write('    networks:\n')
+                f.write('      - proxy\n')
+                f.write('    environment:\n')
+                f.write(f'      - TOKEN={earnapp_token}\n')
+                f.write(f'      - TZ={timezone}\n')
+                f.write('    labels:\n')
+                f.write('      - traefik.enable=true\n')
+                f.write(f'      - traefik.http.routers.earnapp.rule=Host(`earnapp.{domain}`)\n')
+                f.write('      - traefik.http.routers.earnapp.entrypoints=websecure\n')
+                f.write('      - traefik.http.routers.earnapp.tls.certresolver=letsencrypt\n')
+                f.write('      - traefik.http.services.earnapp.loadbalancer.server.port=80\n\n')
+        
+        # Repocket
+        if services.get("repocket", True):
+            repocket_token = services.get("repocket", {}).get("token", "")
+            if repocket_token:
+                f.write('  repocket:\n')
+                f.write('    image: ghcr.io/repocket/repocket:latest\n')
+                f.write('    container_name: repocket\n')
+                f.write('    restart: unless-stopped\n')
+                f.write('    networks:\n')
+                f.write('      - proxy\n')
+                f.write('    environment:\n')
+                f.write(f'      - REPOCKET_TOKEN={repocket_token}\n')
+                f.write(f'      - TZ={timezone}\n')
+                f.write('    labels:\n')
+                f.write('      - traefik.enable=true\n')
+                f.write(f'      - traefik.http.routers.repocket.rule=Host(`repocket.{domain}`)\n')
+                f.write('      - traefik.http.routers.repocket.entrypoints=websecure\n')
+                f.write('      - traefik.http.routers.repocket.tls.certresolver=letsencrypt\n')
+                f.write('      - traefik.http.services.repocket.loadbalancer.server.port=80\n')
+    
+    print("✅ docker-compose.yml wurde erfolgreich generiert!")
+    print(f"   Domain: {domain}")
+    print("   Enthaltene Services: Traefik + " + 
+          ("Portainer, " if services.get("portainer", True) else "") +
+          ("EarnApp, " if services.get("earnapp", {}).get("token") else "") +
+          ("Repocket" if services.get("repocket", {}).get("token") else ""))
 
 if __name__ == "__main__":
-    exit(main())
+    main()
