@@ -1,88 +1,116 @@
 #!/usr/bin/env python3
 import json
-import platform
 import os
-import sys
 from pathlib import Path
 
-# ==================== KONFIGURATION ====================
-SCRIPT_DIR = Path(__file__).parent
-CONFIG_DIR = SCRIPT_DIR / "config"
-APPS_JSON = CONFIG_DIR / "apps.json"
-USER_CONFIG_JSON = CONFIG_DIR / "user-config.json"
-OUTPUT_FILE = SCRIPT_DIR / "docker-compose.yaml"
+# Pfade
+CONFIG_DIR = Path("config")
+APPS_FILE = CONFIG_DIR / "apps.json"
+USER_CONFIG_FILE = CONFIG_DIR / "user-config.json"
+OUTPUT_FILE = Path("docker-compose.yaml")
 
-def detect_architecture():
-    machine = platform.machine().lower()
-    if machine in ['aarch64', 'arm64']:
-        return 'arm64'
-    elif machine in ['armv7l', 'arm']:
-        return 'arm32'
-    return 'amd64'
-
-def load_json_file(file_path):
-    try:
-        with open(file_path, 'r', encoding='utf-8') as f:
-            return json.load(f)
-    except Exception as e:
-        print(f"❌ Fehler beim Laden von {file_path}: {e}")
-        sys.exit(1)
-
-def write_compose(services):
-    """Schreibt die finale docker-compose.yaml"""
-    compose = {
-        "version": "3.9",
-        "name": "passivestack",
-        "services": services
-    }
-    
-    with open(OUTPUT_FILE, 'w', encoding='utf-8') as f:
-        f.write("# =============================================\n")
-        f.write("# AUTOMATISCH GENERIERT VON generate-compose.py\n")
-        f.write("# NICHT MANUELL BEARBEITEN - ÄNDERUNGEN GEHEN VERLOREN!\n")
-        f.write("# =============================================\n\n")
-        f.write(json.dumps(compose, indent=2))
-    
-    print("✅ docker-compose.yaml wurde erfolgreich generiert!")
+def load_json(file_path):
+    with open(file_path, 'r', encoding='utf-8') as f:
+        return json.load(f)
 
 def main():
-    arch = detect_architecture()
-    print(f"🖥️  Erkannte Architektur: {arch}")
-    
-    apps = load_json_file(APPS_JSON)
-    user_config = load_json_file(USER_CONFIG_JSON)
-    
-    services = {}
-    
-    # System-Dienste (immer aktiv)
-    system_services = ["traefik", "homepage", "portainer", "watchtower", "fail2ban"]
-    for svc in system_services:
-        if svc in apps and apps[svc].get("enabled", True):
-            services[svc] = apps[svc].copy()
-            # Platzhalter durch echte Werte aus user_config ersetzen
-            if "environment" in services[svc]:
-                for key, value in services[svc]["environment"].items():
-                    if isinstance(value, str) and value.startswith("${") and value.endswith("}"):
-                        env_key = value.strip("${}").split(":")[0]
-                        services[svc]["environment"][key] = user_config.get("security", {}).get(env_key.lower(), value)
-    
-    # DePIN / Passive Earning Dienste (nur wenn in user-config aktiviert)
-    if "services" in user_config:
-        for app_name, config in user_config["services"].items():
-            if isinstance(config, dict) and config.get("enabled", False):
-                if app_name in apps:
-                    app_template = apps[app_name].copy()
-                    # Credentials aus user-config einfügen
-                    if "environment" in app_template:
-                        for k, v in config.items():
-                            if k.upper() in app_template["environment"] or k in app_template["environment"]:
-                                app_template["environment"][k.upper()] = v
-                    services[app_name] = app_template
-                else:
-                    print(f"⚠️  App {app_name} ist in user-config aktiviert, aber nicht in apps.json definiert.")
-    
-    write_compose(services)
-    print("✅ Fertig!")
+    if not APPS_FILE.exists():
+        print(f"Fehler: {APPS_FILE} nicht gefunden!")
+        return 1
+    if not USER_CONFIG_FILE.exists():
+        print(f"Fehler: {USER_CONFIG_FILE} nicht gefunden!")
+        return 1
+
+    apps = load_json(APPS_FILE)
+    user_config = load_json(USER_CONFIG_FILE)
+
+    # Basis-Konfiguration
+    compose = {
+        "version": "3.8",
+        "services": {},
+        "networks": {
+            "proxy": {
+                "name": "proxy",
+                "driver": "bridge",
+                "external": False
+            }
+        },
+        "volumes": {}
+    }
+
+    # Environment-Variablen aus user-config
+    env = {
+        "TIMEZONE": user_config.get("timezone", "Europe/Berlin"),
+        "DOMAIN": user_config.get("domain", "yourdomain.com"),
+        "EMAIL": user_config.get("email", "your@email.com")
+    }
+
+    # Grass Credentials
+    if user_config.get("grass"):
+        env["GRASS_EMAIL"] = user_config["grass"].get("email", "")
+        env["GRASS_PASSWORD"] = user_config["grass"].get("password", "")
+
+    # Honeygain Credentials
+    if user_config.get("honeygain"):
+        env["HONEYGAIN_EMAIL"] = user_config["honeygain"].get("email", "")
+        env["HONEYGAIN_PASSWORD"] = user_config["honeygain"].get("password", "")
+
+    # Weitere Credentials
+    if user_config.get("earnapp"):
+        env["EARNAPP_TOKEN"] = user_config["earnapp"].get("token", "")
+    if user_config.get("iproyal"):
+        env["IPROYAL_EMAIL"] = user_config["iproyal"].get("email", "")
+        env["IPROYAL_PASSWORD"] = user_config["iproyal"].get("password", "")
+    if user_config.get("repocket"):
+        env["REPOCKET_EMAIL"] = user_config["repocket"].get("email", "")
+        env["REPOCKET_API_KEY"] = user_config["repocket"].get("api_key", "")
+    if user_config.get("traffmonetizer"):
+        env["TRAFFMONETIZER_TOKEN"] = user_config["traffmonetizer"].get("token", "")
+    if user_config.get("packetstream"):
+        env["PACKETSTREAM_CID"] = user_config["packetstream"].get("cid", "")
+
+    # Services generieren
+    for app_name, app_config in apps.items():
+        if not app_config.get("enabled", False):
+            continue
+
+        service = {
+            "image": app_config["image"],
+            "container_name": app_config.get("container_name", app_name),
+            "restart": app_config.get("restart", "unless-stopped")
+        }
+
+        if "networks" in app_config:
+            service["networks"] = app_config["networks"]
+        if "ports" in app_config:
+            service["ports"] = app_config["ports"]
+        if "volumes" in app_config:
+            service["volumes"] = app_config["volumes"]
+        if "environment" in app_config:
+            service_env = app_config["environment"].copy()
+            # Platzhalter durch echte Werte ersetzen
+            for key, value in service_env.items():
+                if isinstance(value, str) and value.startswith("${") and value.endswith("}"):
+                    var_name = value.strip("${}").split(":")[0]
+                    service_env[key] = env.get(var_name, value)
+            service["environment"] = service_env
+        if "labels" in app_config:
+            service["labels"] = app_config["labels"]
+        if "command" in app_config:
+            service["command"] = app_config["command"]
+        if "hostname" in app_config:
+            service["hostname"] = app_config["hostname"]
+
+        compose["services"][app_name] = service
+
+    # Datei schreiben
+    with open(OUTPUT_FILE, 'w', encoding='utf-8') as f:
+        json.dump(compose, f, indent=2)
+        f.write("\n")  # Zusätzlichen Zeilenumbruch für bessere Lesbarkeit
+
+    print(f"✅ docker-compose.yaml erfolgreich generiert mit {len(compose['services'])} aktiven Services.")
+    print(f"   Generierte Services: {', '.join(compose['services'].keys())}")
+    return 0
 
 if __name__ == "__main__":
-    main()
+    exit(main())
