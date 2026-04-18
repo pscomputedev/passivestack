@@ -70,7 +70,7 @@
     }
   },
   "grass": {
-    "enabled": false,
+    "enabled": true,
     "image": "mrcolorrain/grass-node:latest",
     "container_name": "grass",
     "restart": "unless-stopped",
@@ -83,7 +83,7 @@
     "volumes": ["./data/grass:/data"]
   },
   "honeygain": {
-    "enabled": false,
+    "enabled": true,
     "image": "honeygain/honeygain:latest",
     "container_name": "honeygain",
     "restart": "unless-stopped",
@@ -95,7 +95,7 @@
     }
   },
   "earnapp": {
-    "enabled": false,
+    "enabled": true,
     "image": "fazalfarooq/earnapp:latest",
     "container_name": "earnapp",
     "restart": "unless-stopped",
@@ -116,7 +116,7 @@
     }
   },
   "pawns": {
-    "enabled": false,
+    "enabled": true,
     "image": "pawnsapp/pawns-cli:latest",
     "container_name": "pawns",
     "restart": "unless-stopped",
@@ -127,7 +127,7 @@
     }
   },
   "repocket": {
-    "enabled": false,
+    "enabled": true,
     "image": "repocket/repocket:latest",
     "container_name": "repocket",
     "restart": "unless-stopped",
@@ -138,14 +138,14 @@
     "volumes": ["./data/repocket:/data"]
   },
   "traffmonetizer": {
-    "enabled": false,
+    "enabled": true,
     "image": "traffmonetizer/cli:latest",
     "container_name": "traffmonetizer",
     "restart": "unless-stopped",
     "command": "start accept --token ${TRAFFMONETIZER_TOKEN}"
   },
   "packetstream": {
-    "enabled": false,
+    "enabled": true,
     "image": "packetstream/psclient:latest",
     "container_name": "packetstream",
     "restart": "unless-stopped",
@@ -154,7 +154,7 @@
     }
   },
   "myst": {
-    "enabled": false,
+    "enabled": true,
     "image": "myst/myst:latest",
     "container_name": "myst",
     "restart": "unless-stopped",
@@ -164,7 +164,7 @@
     "ports": ["4449:4449"]
   },
   "bitping": {
-    "enabled": false,
+    "enabled": true,
     "image": "bitping/bitping-node:latest",
     "container_name": "bitping",
     "restart": "unless-stopped",
@@ -175,7 +175,7 @@
     "volumes": ["./data/bitping:/data"]
   },
   "earnfm": {
-    "enabled": false,
+    "enabled": true,
     "image": "earnfm/earnfm-client:latest",
     "container_name": "earnfm",
     "restart": "unless-stopped",
