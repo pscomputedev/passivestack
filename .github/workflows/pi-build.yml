@@ -34,29 +34,32 @@ jobs:
           # Stage kopieren (aus image/ Verzeichnis)
           if [ -d "image/stage-passivestack" ]; then
             cp -r image/stage-passivestack pi-gen/stage-passivestack
-            echo "Copied from image/stage-passivestack"
+            echo "✅ Copied from image/stage-passivestack"
           else
-            echo "ERROR: image/stage-passivestack not found!"
+            echo "❌ ERROR: image/stage-passivestack not found!"
+            ls -la
+            find . -type d -name "stage-passivestack"
             exit 1
           fi
           
           # Ausführbar machen
-          chmod +x pi-gen/stage-passivestack/*.sh 2>/dev/null || true
+          chmod +x pi-gen/stage-passivestack/00-passivestack/*.sh 2>/dev/null || true
           
           echo "=== Stage content ==="
           ls -la pi-gen/stage-passivestack/
+          ls -la pi-gen/stage-passivestack/00-passivestack/
 
       - name: Create pi-gen Config
         run: |
           cat > pi-gen/config << 'EOF'
           IMG_NAME=PassiveStack
-          RELEASE=bullseye
+          RELEASE=bookworm
           DEPLOY_ZIP=1
           DEPLOY_DIR=../deploy
           HOSTNAME=passivestack
-          FIRST_USER_PASS=raspberry
+          FIRST_USER_PASS=passivestack
           ENABLE_SSH=1
-          STAGE_LIST=stage0 stage1 stage2 stage-passivestack
+          STAGE_LIST="stage0 stage1 stage2 stage-passivestack"
           EOF
 
       - name: Install Build Dependencies
