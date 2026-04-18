@@ -1,39 +1,38 @@
 # =============================================
-# PassiveStack – Sicherheitsrelevante Dateien
+# PassiveStack – SICHERE .gitignore
 # =============================================
 
-# WICHTIG: Diese Dateien dürfen NIE ins Git!
+# === GEHEIME / SENSIBLE DATEIEN (NIE ins Git hochladen!) ===
 .env
 .env.local
 .env.*.local
 user-config.json
 config/user-config.json
 
-# Generierte Dateien
+# === GENERIERTE DATEIEN ===
 docker-compose.yaml
 docker-compose.yml
 compose.yaml
-config/user-config.example.json   # falls wir eine Beispiel-Datei im config-Ordner haben
+generated/
 
-# Daten & Media (können groß werden oder sensible Infos enthalten)
+# === DATENVERZEICHNISSE ===
 data/
-.media/
 media/
 .data/
+downloads/
 
-# Logs
+# === LOGS ===
 *.log
 logs/
 *.log.*
 
-# Temporäre Dateien
+# === TEMPORÄRE DATEIEN ===
 tmp/
 temp/
 *.tmp
 *.temp
-generated/
 
-# Python Cache & Build Artefakte
+# === PYTHON CACHE & BUILD ARTEFAKTE ===
 __pycache__/
 *.py[cod]
 *$py.class
@@ -54,7 +53,7 @@ wheels/
 pip-wheel-metadata/
 *.egg-info/
 
-# IDEs und Editoren
+# === IDEs & Editoren ===
 .vscode/
 .idea/
 *.swp
@@ -63,7 +62,7 @@ pip-wheel-metadata/
 .project
 .pydevproject
 
-# OS generierte Dateien
+# === OS GENERIERTE DATEIEN ===
 .DS_Store
 .DS_Store?
 ._*
@@ -72,14 +71,13 @@ pip-wheel-metadata/
 ehthumbs.db
 Thumbs.db
 
-# Docker
+# === DOCKER ===
 .dockerignore
 docker-compose.override.yml
 
-# Sonstiges
+# === SONSTIGES ===
 node_modules/
 coverage/
 .coverage
 *.bak
 *.backup
-dashboard/.config/app-config.json
