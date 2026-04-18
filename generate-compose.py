@@ -1,3 +1,64 @@
+import json
+import os
+from jinja2 import Template
+
+# Lade Konfigurationen
+with open('config/apps.json', 'r') as f:
+    apps = json.load(f)
+
+with open('user-config.json', 'r') as f:
+    user_config = json.load(f)
+
+# Basis Docker Compose Template (komplett)
+compose_template = """version: '3.8'
+
+networks:
+  proxy:
+    external: true
+  default:
+    driver: bridge
+
+services:
+{% for service_name, config in apps.items() %}
+  {% if config.get('enabled', False) or service_name in ['traefik', 'homepage', 'portainer', 'watchtower'] %}
+  {{ service_name }}:
+    image: {{ config['image'] }}
+    container_name: {{ config.get('container_name', service_name) }}
+    restart: {{ config.get('restart', 'unless-stopped') }}
+    {% if config.get('security_opt') %}security_opt: {{ config['security_opt'] | tojson }}{% endif %}
+    {% if config.get('networks') %}networks: {{ config['networks'] | tojson }}{% endif %}
+    {% if config.get('ports') %}ports: {{ config['ports'] | tojson }}{% endif %}
+    {% if config.get('volumes') %}volumes: {{ config['volumes'] | tojson }}{% endif %}
+    {% if config.get('environment') %}
+    environment:
+      {% for key, value in config['environment'].items() %}
+      - {{ key }}={{ value }}
+      {% endfor %}
+    {% endif %}
+    {% if config.get('command') %}command: {{ config['command'] }}{% endif %}
+    {% if config.get('labels') %}
+    labels:
+      {% for key, value in config['labels'].items() %}
+      - "{{ key }}={{ value }}"
+      {% endfor %}
+    {% endif %}
+  {% endif %}
+{% endfor %}
+"""
+
+# Render Template
+template = Template(compose_template)
+rendered = template.render(apps=apps)
+
+# Schreibe docker-compose.yml
+with open('docker-compose.yml', 'w') as f:
+    f.write(rendered)
+
+print("✅ docker-compose.yml wurde erfolgreich generiert!")
+print("   Aktivierte Services:")
+for name, cfg in apps.items():
+    if cfg.get('enabled', False) or name in ['traefik', 'homepage', 'portainer', 'watchtower']:
+        print(f"   - {name}")
 #!/usr/bin/env python3
 import json
 import os
