@@ -1,42 +1,54 @@
 {
-  "timezone": "Europe/Berlin",
-  "domain": "yourdomain.com",
-  "email": "your@email.com",
-  "grass": {
-    "email": "",
-    "password": ""
+  "_comment": "PassiveStack User-Konfiguration – Passe deine Zugangsdaten an. Leere Felder = Service wird deaktiviert",
+  "_version": "2.0",
+  "global": {
+    "data_dir": "./data",
+    "timezone": "Europe/Berlin",
+    "domain": "yourdomain.com",
+    "email": "your@email.com",
+    "local_ip": "192.168.178.50"
   },
-  "honeygain": {
-    "email": "",
-    "password": "",
-    "device": "passivestack-pi"
+  "watchtower": {
+    "enabled": true
   },
-  "earnapp": {
-    "token": ""
-  },
-  "iproyal": {
-    "email": "",
-    "password": "",
-    "device": "passivestack-pi"
-  },
-  "repocket": {
-    "email": "",
-    "api_key": ""
-  },
-  "traffmonetizer": {
-    "token": ""
-  },
-  "packetstream": {
-    "cid": ""
-  },
-  "earnfm": {
-    "token": ""
-  },
-  "bitping": {
-    "email": "",
-    "password": ""
-  },
-  "mysterium": {
-    "api_key": ""
+  "apps": {
+    "grass": {
+      "email": "",
+      "password": ""
+    },
+    "honeygain": {
+      "email": "",
+      "password": "",
+      "device": "passivestack-pi"
+    },
+    "earnapp": {
+      "token": ""
+    },
+    "iproyal": {
+      "email": "",
+      "password": "",
+      "device": "passivestack-pi",
+      "device_id": "auto"
+    },
+    "repocket": {
+      "email": "",
+      "api_key": ""
+    },
+    "traffmonetizer": {
+      "token": ""
+    },
+    "packetstream": {
+      "cid": ""
+    },
+    "earnfm": {
+      "token": ""
+    },
+    "bitping": {
+      "email": "",
+      "password": ""
+    },
+    "mysterium": {
+      "api_key": ""
+    }
   }
 }
