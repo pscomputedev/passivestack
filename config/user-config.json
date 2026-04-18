@@ -4,7 +4,7 @@
   "global": {
     "data_dir": "./data",
     "timezone": "Europe/Berlin",
-    "local_ip": "192.168.178.50"
+    "local_ip": "192.168.178.36"
   },
   "watchtower": {
     "enabled": true
@@ -53,8 +53,8 @@
     "plex": {
       "enabled": false,
       "env": {
-        "PLEX_CLAIM": "claim-XXXXXXXXXXXXXXXXXXXXXXXX",
-        "ADVERTISE_IP": "http://192.168.178.50:32400/"
+        "PLEX_CLAIM": "claim-jbgSjQGBz_PKxQiYGVyv",
+        "ADVERTISE_IP": "http://192.168.178.36:32400/"
       }
     }
   },
