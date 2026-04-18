@@ -2,47 +2,45 @@
 set -e
 
 echo "=========================================="
-echo "   PassiveStack Installer"
+echo "   PassiveStack Installer - GitHub Edition"
 echo "=========================================="
 
-# Farben
 GREEN='\033[0;32m'
 YELLOW='\033[1;33m'
 RED='\033[0;31m'
 NC='\033[0m'
 
-# Verzeichnisse erstellen
-echo -e "${YELLOW}Erstelle Verzeichnisstruktur...${NC}"
-mkdir -p config data/traefik data/portainer data/earnapp data/repocket
-mkdir -p traefik
+echo -e "${YELLOW}Prüfe Verzeichnisstruktur...${NC}"
 
-# Berechtigungen für acme.json
+# Verzeichnisse sicherstellen
+mkdir -p config data/traefik data/portainer data/earnapp data/repocket traefik
+
+# acme.json mit korrekten Rechten (wird beim ersten Docker-Start gesetzt)
 if [ ! -f data/traefik/acme.json ]; then
-    echo -e "${YELLOW}Erstelle acme.json mit korrekten Rechten...${NC}"
+    echo -e "${YELLOW}Erstelle acme.json...${NC}"
     touch data/traefik/acme.json
-    chmod 600 data/traefik/acme.json
+    chmod 600 data/traefik/acme.json 2>/dev/null || true
 fi
 
-# generate-compose.py ausführbar machen
-chmod +x generate-compose.py
+# generate-compose.py muss ausführbar sein
+chmod +x generate-compose.py 2>/dev/null || true
 
-# user-config.json prüfen
+echo -e "${YELLOW}Prüfe user-config.json...${NC}"
 if [ ! -f config/user-config.json ]; then
-    echo -e "${RED}Fehler: config/user-config.json nicht gefunden!${NC}"
-    echo "Bitte erstelle diese Datei zuerst."
+    echo -e "${RED}Fehler: config/user-config.json fehlt!${NC}"
+    echo "Bitte lege diese Datei zuerst an (siehe vorherige Schritte)."
     exit 1
 fi
 
-# docker-compose.yaml generieren
-echo -e "${YELLOW}Generiere docker-compose.yaml...${NC}"
+echo -e "${YELLOW}Generiere docker-compose.yml...${NC}"
 if ! ./generate-compose.py; then
-    echo -e "${RED}Fehler beim Generieren der compose Datei!${NC}"
+    echo -e "${RED}Fehler beim Generieren von docker-compose.yml!${NC}"
     exit 1
 fi
 
-# Traefik Konfiguration kopieren falls nicht vorhanden
+# Standard-Traefik-Konfiguration
 if [ ! -f traefik/traefik.yml ]; then
-    echo -e "${YELLOW}Erstelle Standard-Traefik Konfiguration...${NC}"
+    echo -e "${YELLOW}Erstelle traefik/traefik.yml...${NC}"
     cat > traefik/traefik.yml << 'EOF'
 global:
   checkNewVersion: true
@@ -62,8 +60,8 @@ entryPoints:
 certificatesResolvers:
   letsencrypt:
     acme:
-      email: ${EMAIL}
-      storage: acme.json
+      email: your@email.com
+      storage: /acme.json
       httpChallenge:
         entryPoint: web
 
@@ -84,7 +82,7 @@ log:
 EOF
 fi
 
-# .env Datei erstellen falls nicht vorhanden
+# .env Datei
 if [ ! -f .env ]; then
     echo -e "${YELLOW}Erstelle .env Datei...${NC}"
     cat > .env << EOF
@@ -94,11 +92,14 @@ EMAIL=your@email.com
 EOF
 fi
 
-echo -e "${GREEN}Installation abgeschlossen!${NC}"
+echo ""
+echo -e "${GREEN}✅ Installation erfolgreich abgeschlossen!${NC}"
 echo ""
 echo "Nächste Schritte:"
-echo "1. Passe config/user-config.json an (Domain, E-Mail, Credentials)"
-echo "2. Starte die Stack mit: docker compose up -d"
-echo "3. Überprüfe mit: docker compose ps"
+echo "1. Passe config/user-config.json an (Tokens, Domain, E-Mail)"
+echo "2. Führe aus: ./generate-compose.py"
+echo "3. Commit + Push die Änderungen"
+echo "4. Auf dem Server: docker compose up -d"
 echo ""
-echo -e "${YELLOW}Wichtig:${NC} Nach Änderungen an user-config.json oder apps.json immer ./generate-compose.py ausführen!"
+echo -e "${YELLOW}Hinweis: chmod-Befehle werden im GitHub-Editor ignoriert.${NC}"
+echo "         Der executable-Bit wird über den Commit gesetzt."
