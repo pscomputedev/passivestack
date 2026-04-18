@@ -1,4 +1,46 @@
 {
+  "global": {
+    "WATCHTOWER_ENABLED": true,
+    "COMPOSE_PROJECT_NAME": "passivestack"
+  },
+  "apps": {
+    "earnapp": {
+      "EARNAPP_UUID": "YOUR_EARNAPP_UUID"
+    },
+    "honeygain": {
+      "HG_TOKEN": "YOUR_HONEYGAIN_TOKEN"
+    },
+    "iproyal": {
+      "IPR_EMAIL": "your@email.com",
+      "IPR_PASSWORD": "yourpassword",
+      "DEVICE_NAME": "PassiveStackNode"
+    },
+    "packetstream": {
+      "CID": "YOUR_PACKETSTREAM_CID"
+    },
+    "peer2profit": {
+      "P2P_EMAIL": "your@email.com"
+    },
+    "traffmonetizer": {
+      "TM_TOKEN": "YOUR_TRAFFMONETIZER_TOKEN"
+    },
+    "repocket": {
+      "RP_EMAIL": "your@email.com",
+      "RP_API_KEY": "YOUR_REPOCKET_API_KEY"
+    },
+    "earnfm": {
+      "EARNFM_TOKEN": "YOUR_EARNFM_TOKEN"
+    },
+    "bitping": {
+      "BITPING_EMAIL": "your@email.com",
+      "BITPING_PASSWORD": "yourpassword"
+    },
+    "mysterium": {
+      "ENABLED": true
+    }
+  }
+}
+{
   "_comment": "PassiveStack User-Konfiguration (Template). Kopiere diese Datei zu 'user-config.json' und passe sie an.",
   "_version": "1.2",
   "global": {
