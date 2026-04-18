@@ -1,311 +1,134 @@
 #!/bin/bash
-# PassiveStack Installation Script - Korrigierte Version
-set -e  # Beende bei Fehlern
+set -e
 
-# Farben für Ausgabe
-RED='\033[0;31m'
-GREEN='\033[0;32m'
-YELLOW='\033[1;33m'
-NC='\033[0m' # No Color
+######################################
+# PassiveStack - Setup Script v1.2
+######################################
 
-# Log-Funktionen
-log_info() {
-    echo -e "${GREEN}[INFO]${NC} $1"
-}
+echo "🚀 PassiveStack Installer wird gestartet..."
 
-log_warn() {
-    echo -e "${YELLOW}[WARN]${NC} $1"
-}
+# Root-Check
+if [[ $EUID -eq 0 ]]; then
+   echo "❌ Bitte nicht als root ausführen. Docker wird ohnehin benötigt."
+   exit 1
+fi
 
-log_error() {
-    echo -e "${RED}[ERROR]${NC} $1"
-}
+# Plattform feststellen
+PLATFORM=$(uname -m)
+DOCKER_COMPOSE_CMD="docker compose"
 
-# Prüfe Root-Rechte
-check_root() {
-    if [ "$EUID" -ne 0 ]; then
-        log_error "Dieses Script benötigt sudo Rechte!"
-        echo "Bitte ausführen mit: sudo ./install.sh"
-        exit 1
+echo "🔍 Plattform: $PLATFORM"
+
+# Prüfung: Docker
+if ! command -v docker &> /dev/null; then
+    echo "🐳 Docker ist nicht installiert. Installation wird gestartet..."
+    curl -fsSL https://get.docker.com -o get-docker.sh
+    sudo sh get-docker.sh
+    sudo usermod -aG docker $USER
+    echo "✅ Docker wurde installiert. Bitte Terminal NEU STARTEN oder 'newgrp docker' ausführen."
+    echo "💡 Danach install.sh erneut ausführen."
+    exit 0
+fi
+
+# Prüfung: docker compose
+if ! $DOCKER_COMPOSE_CMD version &> /dev/null; then
+    echo "🔧 'docker compose' nicht gefunden. Bitte Docker Compose Plugin installieren."
+    echo "💡 Ubuntu/Debian: sudo apt install docker-compose-plugin"
+    exit 1
+fi
+
+# Abhängigkeiten
+if ! command -v python3 &> /dev/null; then
+    echo "🐍 Python3 fehlt. Installiere..."
+    sudo apt update && sudo apt install -y python3
+fi
+
+# Setup config Ordner
+mkdir -p config/data
+
+# Template config kopieren (falls noch nicht existent)
+if [ ! -f "config/user-config.json" ]; then
+    echo "📝 Erstelle config/user-config.json aus Template..."
+    cp config/user-config.example.json config/user-config.json
+fi
+
+# Generate compose
+echo "⚙️ Generiere docker-compose.yml..."
+python3 generate-compose.py
+
+# App Token Abfrage
+echo "🔐 App-Token Konfiguration"
+
+ask_field() {
+    local app=$1
+    local key=$2
+    local value=$(jq -r ".apps.$app.$key" config/user-config.json 2>/dev/null)
+    if [[ "$value" == "null" ]] || [[ -z "$value" ]] || [[ "$value" == *"dein-"* ]]; then
+        read -p "[$app] $key: " input
+        jq ".apps.$app.$key = \"$input\"" config/user-config.json > tmp.$$.json && mv tmp.$$.json config/user-config.json
     fi
 }
 
-# Prüfe Betriebssystem
-check_os() {
-    if ! command -v lsb_release &> /dev/null; then
-        apt-get update && apt-get install -y lsb-release
-    fi
-    
-    OS=$(lsb_release -si)
-    ARCH=$(uname -m)
-    
-    case "$ARCH" in
-        "x86_64") ARCH="amd64" ;;
-        "aarch64"|"armv8l"|"armv7l") ARCH="arm64" ;;
-        *) ARCH="unknown" ;;
-    esac
-    
-    log_info "Betriebssystem: $OS"
-    log_info "Architektur: $ARCH"
-    
-    if [ "$ARCH" = "unknown" ]; then
-        log_error "Nicht unterstützte Architektur: $(uname -m)"
-        exit 1
-    fi
-}
-
-# Prüfe Docker
-check_docker() {
-    if ! command -v docker &> /dev/null; then
-        log_warn "Docker nicht gefunden. Installiere..."
-        curl -fsSL https://get.docker.com -o get-docker.sh
-        sh get-docker.sh
-        rm get-docker.sh
-        usermod -aG docker $USER
-    else
-        log_info "Docker ist installiert"
-    fi
-    
-    # Starte Docker wenn nicht läuft
-    if ! systemctl is-active --quiet docker; then
-        log_warn "Docker Dienst wird gestartet..."
-        systemctl start docker
-        systemctl enable docker
-    fi
-}
-
-# Prüfe Docker Compose
-check_docker_compose() {
-    if ! command -v docker-compose &> /dev/null; then
-        log_warn "Docker Compose nicht gefunden. Installiere..."
-        
-        # Für ARM64 (Raspberry Pi) spezielle Installation
-        if [ "$ARCH" = "arm64" ]; then
-            curl -L "https://github.com/docker/compose/releases/download/v2.20.0/docker-compose-linux-aarch64" \
-                -o /usr/local/bin/docker-compose
-        else
-            curl -L "https://github.com/docker/compose/releases/download/v2.20.0/docker-compose-linux-$(uname -m)" \
-                -o /usr/local/bin/docker-compose
-        fi
-        
-        chmod +x /usr/local/bin/docker-compose
-    else
-        log_info "Docker Compose ist installiert"
-    fi
-}
-
-# Backup bestehender Installation
-backup_existing() {
-    local backup_dir="/var/backups/passivestack_$(date +%Y%m%d_%H%M%S)"
-    
-    if [ -d "/opt/passivestack" ]; then
-        log_info "Erstelle Backup in $backup_dir"
-        mkdir -p "$backup_dir"
-        
-        # Backup Compose-Datei
-        if [ -f "/opt/passivestack/docker-compose.yaml" ]; then
-            cp "/opt/passivestack/docker-compose.yaml" "$backup_dir/"
-        fi
-        
-        # Backup Config
-        if [ -d "/opt/passivestack/config" ]; then
-            cp -r "/opt/passivestack/config" "$backup_dir/"
-        fi
-        
-        log_info "Backup abgeschlossen"
-    fi
-}
-
-# Kopiere Dateien
-copy_files() {
-    local install_dir="/opt/passivestack"
-    
-    log_info "Kopiere Dateien nach $install_dir"
-    
-    # Erstelle Verzeichnisstruktur
-    mkdir -p "$install_dir"
-    mkdir -p "$install_dir/config"
-    mkdir -p "$install_dir/logs"
-    mkdir -p "$install_dir/data"
-    
-    # Kopiere alle Dateien
-    cp -r ./* "$install_dir/"
-    
-    # Setze korrekte Berechtigungen
-    chmod +x "$install_dir/install.sh"
-    chmod +x "$install_dir/generate-compose.py"
-    chmod +x "$install_dir/update.sh"
-    
-    log_info "Dateien kopiert"
-}
-
-# Erstelle user-config.json Template
-create_user_config() {
-    local config_file="/opt/passivestack/config/user-config.json"
-    
-    if [ ! -f "$config_file" ]; then
-        log_info "Erstelle user-config.json Template"
-        
-        cat > "$config_file" << EOF
-{
-  "device_name": "passivestack",
-  "apps": {
-    "earnapp": {
-      "enabled": false,
-      "credentials": {
-        "EMAIL": "your-email@example.com",
-        "REFCODE": ""
-      }
-    },
-    "honeygain": {
-      "enabled": false,
-      "credentials": {
-        "EMAIL": "your-email@example.com",
-        "PASSWORD": "your-password"
-      }
-    },
-    "iproyal": {
-      "enabled": false,
-      "credentials": {
-        "EMAIL": "your-email@example.com",
-        "PASSWORD": "your-password"
-      }
-    },
-    "packetstream": {
-      "enabled": false,
-      "credentials": {
-        "CID": "your-client-id"
-      }
-    },
-    "peer2profit": {
-      "enabled": false,
-      "credentials": {
-        "EMAIL": "your-email@example.com"
-      }
-    },
-    "traffmonetizer": {
-      "enabled": false,
-      "credentials": {
-        "TOKEN": "your-token"
-      }
-    },
-    "repocket": {
-      "enabled": false,
-      "credentials": {
-        "EMAIL": "your-email@example.com",
-        "API": "your-api-key"
-      }
-    },
-    "earnfish": {
-      "enabled": false,
-      "credentials": {
-        "TOKEN": "your-token"
-      }
-    },
-    "bitping": {
-      "enabled": false,
-      "credentials": {
-        "EMAIL": "your-email@example.com",
-        "PASSWORD": "your-password",
-        "MFA_CODE": ""
-      }
-    },
-    "mysterium": {
-      "enabled": false,
-      "credentials": {
-        "IDENTITY_PASSWORD": "your-password"
-      }
-    }
-  }
-}
-EOF
-        
-        log_warn "⚠️  Bitte bearbeiten: $config_file"
-        log_warn "   Setze 'enabled': true für gewünschte Apps"
-        log_warn "   Trage deine Credentials ein"
-    else
-        log_info "user-config.json existiert bereits"
-    fi
-}
-
-# Erstelle docker-compose.yaml
-generate_compose() {
-    log_info "Generiere docker-compose.yaml"
-    
-    cd /opt/passivestack
-    
-    if [ -f "generate-compose.py" ]; then
-        python3 generate-compose.py
-        if [ $? -eq 0 ]; then
-            log_info "docker-compose.yaml erfolgreich generiert"
-        else
-            log_error "Fehler bei generate-compose.py"
-            exit 1
-        fi
-    else
-        log_error "generate-compose.py nicht gefunden"
-        exit 1
-    fi
-}
-
-# Starte Container
-start_containers() {
-    log_info "Starte Docker Container..."
-    
-    cd /opt/passivestack
-    
-    if [ -f "docker-compose.yaml" ]; then
-        docker-compose up -d
-        
-        # Warte auf Container
-        sleep 10
-        
-        # Zeige Status
-        docker-compose ps
-        
-        log_info "✅ PassiveStack wurde erfolgreich installiert!"
+# Nur aktive Apps abfragen
+for app in earnapp honeygain iproyal packetstream peer2profit traffmonetizer repocket earnfm bitping mysterium; do
+    isActive=$(jq -r ".overrides.$app.enabled // (.apps.$app | if .enabled_by_default == true then \"true\" else \"false\" end)" config/apps.json config/user-config.json | tail -n1)
+    if [[ "$isActive" == "true" ]]; then
         echo ""
-        echo "📋 NÄCHSTE SCHRITTE:"
-        echo "1. Bearbeite die Konfiguration: /opt/passivestack/config/user-config.json"
-        echo "2. Aktualisiere die Container: cd /opt/passivestack && ./update.sh"
-        echo "3. Logs anzeigen: docker-compose logs -f"
-        echo ""
-        echo "🔧 Verwaltung:"
-        echo "   cd /opt/passivestack"
-        echo "   docker-compose stop      # Stoppt alle Container"
-        echo "   docker-compose start     # Startet alle Container"
-        echo "   docker-compose restart   # Startet alle Container neu"
-        echo "   ./update.sh              # Aktualisiert alle Container"
-        
-    else
-        log_error "docker-compose.yaml nicht gefunden"
-        exit 1
+        echo "🔹 $app Setup"
+        case "$app" in
+            earnapp)
+                ask_field earnapp EARNAPP_UUID
+                ;;
+            honeygain)
+                ask_field honeygain HONEYGAIN_EMAIL
+                ask_field honeygain HONEYGAIN_PASSWORD
+                ask_field honeygain HONEYGAIN_DEVICE
+                ;;
+            iproyal)
+                ask_field iproyal IPRoyal_EMAIL
+                ask_field iproyal IPRoyal_PASSWORD
+                ask_field iproyal IPRoyal_DEVICE
+                ask_field iproyal IPRoyal_DEVICE_ID
+                ;;
+            packetstream)
+                ask_field packetstream CID
+                ;;
+            peer2profit)
+                ask_field peer2profit P2P_EMAIL
+                ;;
+            traffmonetizer)
+                ask_field traffmonetizer TRAFFMONETIZER_TOKEN
+                ;;
+            repocket)
+                ask_field repocket RP_EMAIL
+                ask_field repocket RP_API_KEY
+                ;;
+            earnfm)
+                ask_field earnfm EARNFM_TOKEN
+                ;;
+            bitping)
+                ask_field bitping BITPING_EMAIL
+                ask_field bitping BITPING_PASSWORD
+                ;;
+            mysterium)
+                echo "[i] Mysterium Node ist aktiviert. Keine manuelle Konfiguration nötig."
+                ;;
+        esac
     fi
-}
+done
 
-# Hauptfunktion
-main() {
-    echo "=========================================="
-    echo "🔄 PassiveStack Installation"
-    echo "=========================================="
-    
-    # Prüfungen
-    check_root
-    check_os
-    check_docker
-    check_docker_compose
-    
-    # Installation
-    backup_existing
-    copy_files
-    create_user_config
-    generate_compose
-    start_containers
-    
-    echo "=========================================="
-    echo "✅ Installation abgeschlossen!"
-    echo "=========================================="
-}
+# Final compose erzeugen
+echo "🔁 Finaler docker-compose.yml wird generiert..."
+python3 generate-compose.py
 
-# Ausführung
-main "$@"
+# Start
+echo "🐋 Container werden gestartet..."
+$DOCKER_COMPOSE_CMD up -d
+
+echo ""
+echo "✅ Installation abgeschlossen!"
+echo "📋 Nützliche Befehle:"
+echo "  - Status:        docker compose ps"
+echo "  - Logs:          docker compose logs -f [appname]"
+echo "  - Stop:          docker compose down"
+echo "  - Update:        ./update.sh"
