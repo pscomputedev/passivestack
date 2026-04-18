@@ -8,18 +8,21 @@
 .env.*.local
 user-config.json
 config/user-config.json
+secrets.json
 
-# === GENERIERTE DATEIEN ===
+# === GENERIERTE / AUTOMATISCH ERSTELLTE DATEIEN ===
 docker-compose.yaml
 docker-compose.yml
 compose.yaml
 generated/
+config/user-config.example.json
 
-# === DATENVERZEICHNISSE ===
+# === DATENVERZEICHNISSE (können groß werden oder sensible Daten enthalten) ===
 data/
 media/
-.data/
+.downloads/
 downloads/
+.data/
 
 # === LOGS ===
 *.log
@@ -39,19 +42,10 @@ __pycache__/
 *.so
 .Python
 build/
-develop-eggs/
 dist/
-downloads/
-eggs/
-.eggs/
-lib/
-lib64/
-parts/
-sdist/
-var/
+*.egg-info/
 wheels/
 pip-wheel-metadata/
-*.egg-info/
 
 # === IDEs & Editoren ===
 .vscode/
