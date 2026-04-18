@@ -47,12 +47,14 @@
       "traefik.enable": "true",
       "traefik.http.routers.portainer.rule": "PathPrefix(`/portainer`)",
       "traefik.http.routers.portainer.entrypoints": "websecure",
-      "traefik.http.routers.portainer.tls.certresolver": "letsencrypt"
+      "traefik.http.routers.portainer.tls.certresolver": "letsencrypt",
+      "traefik.http.services.portainer.loadbalancer.server.port": "9000"
     }
   },
   "watchtower": {
     "enabled": true,
     "image": "containrrr/watchtower:latest",
+    "container_name": "watchtower",
     "restart": "unless-stopped",
     "volumes": ["/var/run/docker.sock:/var/run/docker.sock"],
     "environment": {
@@ -67,10 +69,11 @@
     "container_name": "grass",
     "restart": "unless-stopped",
     "hostname": "grass-node",
+    "networks": ["proxy"],
     "environment": {
-      "USER_EMAIL": "${GRASS_EMAIL:-}",
-      "USER_PASSWORD": "${GRASS_PASSWORD:-}",
-      "DEVICE_NAME": "passivestack"
+      "USER_EMAIL": "${GRASS_EMAIL}",
+      "USER_PASSWORD": "${GRASS_PASSWORD}",
+      "DEVICE_NAME": "${DEVICE_NAME:-passivestack}"
     },
     "volumes": ["./data/grass:/data"]
   },
@@ -83,7 +86,7 @@
     "environment": {
       "HONEYGAIN_EMAIL": "",
       "HONEYGAIN_PASSWORD": "",
-      "DEVICE_NAME": "passivestack"
+      "DEVICE_NAME": "${DEVICE_NAME:-passivestack}"
     }
   },
   "earnapp": {
@@ -91,6 +94,7 @@
     "image": "fazalfarooq/earnapp:latest",
     "container_name": "earnapp",
     "restart": "unless-stopped",
+    "networks": ["proxy"],
     "environment": {
       "EARNAPP_TOKEN": ""
     },
@@ -102,9 +106,9 @@
     "container_name": "iproyal",
     "restart": "unless-stopped",
     "environment": {
-      "IPROYAL_EMAIL": "",
-      "IPROYAL_PASSWORD": "",
-      "IPROYAL_DEVICE_NAME": "passivestack"
+      "IPROYAL_EMAIL": "${IPROYAL_EMAIL}",
+      "IPROYAL_PASSWORD": "${IPROYAL_PASSWORD}",
+      "IPROYAL_DEVICE_NAME": "${DEVICE_NAME:-passivestack}"
     }
   },
   "repocket": {
@@ -112,9 +116,10 @@
     "image": "repocket/repocket:latest",
     "container_name": "repocket",
     "restart": "unless-stopped",
+    "networks": ["proxy"],
     "environment": {
-      "REPOCKET_EMAIL": "",
-      "REPOCKET_API_KEY": ""
+      "REPOCKET_EMAIL": "${REPOCKET_EMAIL}",
+      "REPOCKET_API_KEY": "${REPOCKET_API_KEY}"
     },
     "volumes": ["./data/repocket:/data"]
   },
@@ -131,7 +136,57 @@
     "container_name": "packetstream",
     "restart": "unless-stopped",
     "environment": {
-      "CID": ""
+      "CID": "${PACKETSTREAM_CID}"
+    }
+  },
+  "nodepay": {
+    "enabled": false,
+    "image": "kellphy/nodepay:latest",
+    "container_name": "nodepay",
+    "restart": "unless-stopped",
+    "networks": ["proxy"],
+    "environment": {
+      "NP_COOKIE": "${NODEPAY_COOKIE}"
+    }
+  },
+  "myst": {
+    "enabled": false,
+    "image": "mystnodes/myst:latest",
+    "container_name": "myst",
+    "restart": "unless-stopped",
+    "networks": ["proxy"],
+    "ports": ["4449:4449"],
+    "environment": {
+      "MYST_WALLET": "${MYST_WALLET}"
+    },
+    "command": "node"
+  },
+  "dawn": {
+    "enabled": false,
+    "image": "ghcr.io/dawninternet/dawn-node:latest",
+    "container_name": "dawn",
+    "restart": "unless-stopped",
+    "environment": {
+      "DAWN_TOKEN": "${DAWN_TOKEN}",
+      "DEVICE_NAME": "${DEVICE_NAME:-passivestack}"
+    }
+  },
+  "silencio": {
+    "enabled": false,
+    "image": "silencio/node:latest",
+    "container_name": "silencio",
+    "restart": "unless-stopped",
+    "environment": {
+      "SILENCIO_API_KEY": "${SILENCIO_API_KEY}"
+    }
+  },
+  "proxyrack": {
+    "enabled": false,
+    "image": "proxyrack/proxyrack:latest",
+    "container_name": "proxyrack",
+    "restart": "unless-stopped",
+    "environment": {
+      "PROXYRACK_API_KEY": "${PROXYRACK_API_KEY}"
     }
   }
 }
