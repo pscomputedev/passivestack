@@ -1,8 +1,107 @@
-version: '3.8'
+version: '3.9'
+
+name: passivestack
+
 services:
-  watchtower:
-    image: containrrr/watchtower:latest
+  traefik:
+    image: traefik:v3.1
+    container_name: traefik
+    restart: unless-stopped
+    security_opt:
+      - no-new-privileges:true
+    networks:
+      - proxy
+    ports:
+      - "${TRAEFIK_HTTP_PORT:-80}:80"
+      - "${TRAEFIK_HTTPS_PORT:-443}:443"
+    volumes:
+      - /var/run/docker.sock:/var/run/docker.sock:ro
+      - ./traefik:/etc/traefik
+      - ./data/traefik/acme.json:/acme.json
+    environment:
+      - TZ=${TIMEZONE:-Europe/Berlin}
+    labels:
+      - "com.centurylinklabs.watchtower.enable=true"
+
+  homepage:
+    image: ghcr.io/gethomepage/homepage:latest
+    container_name: homepage
+    restart: unless-stopped
+    networks:
+      - proxy
+    volumes:
+      - ./config:/app/config
+      - ./data/homepage:/app/data
+    environment:
+      - TZ=${TIMEZONE:-Europe/Berlin}
+      - HOMEPAGE_VAR_LOG_LEVEL=${LOG_LEVEL:-info}
+    labels:
+      - "traefik.enable=true"
+      - "traefik.http.routers.homepage.rule=PathPrefix(`/`)"
+      - "traefik.http.routers.homepage.entrypoints=websecure"
+      - "traefik.http.routers.homepage.tls.certresolver=letsencrypt"
+      - "com.centurylinklabs.watchtower.enable=true"
+
+  portainer:
+    image: portainer/portainer-ce:latest
+    container_name: portainer
+    restart: unless-stopped
+    networks:
+      - proxy
     volumes:
       - /var/run/docker.sock:/var/run/docker.sock
-    command: --cleanup --interval 86400
+      - ./data/portainer:/data
+    environment:
+      - TZ=${TIMEZONE:-Europe/Berlin}
+    labels:
+      - "traefik.enable=true"
+      - "traefik.http.routers.portainer.rule=PathPrefix(`/portainer`)"
+      - "traefik.http.routers.portainer.entrypoints=websecure"
+      - "traefik.http.routers.portainer.middlewares=portainer-stripprefix"
+      - "traefik.http.middlewares.portainer-stripprefix.stripprefix.prefixes=/portainer"
+      - "traefik.http.routers.portainer.tls.certresolver=letsencrypt"
+      - "com.centurylinklabs.watchtower.enable=true"
+
+  watchtower:
+    image: containrrr/watchtower:latest
+    container_name: watchtower
     restart: unless-stopped
+    networks:
+      - proxy
+    volumes:
+      - /var/run/docker.sock:/var/run/docker.sock
+    environment:
+      - TZ=${TIMEZONE:-Europe/Berlin}
+      - WATCHTOWER_SCHEDULE=${WATCHTOWER_SCHEDULE:-0 4 * * *}
+      - WATCHTOWER_CLEANUP=true
+      - WATCHTOWER_ROLLING_RESTART=true
+      - WATCHTOWER_NOTIFICATION_EMAIL=${WATCHTOWER_NOTIFICATION_EMAIL:-}
+    labels:
+      - "com.centurylinklabs.watchtower.enable=true"
+
+  fail2ban:
+    image: crazymax/fail2ban:latest
+    container_name: fail2ban
+    restart: unless-stopped
+    networks:
+      - proxy
+    cap_add:
+      - NET_ADMIN
+      - NET_RAW
+    volumes:
+      - ./data/fail2ban:/data
+      - /var/log:/var/log:ro
+    environment:
+      - TZ=${TIMEZONE:-Europe/Berlin}
+      - F2B_LOG_LEVEL=INFO
+
+networks:
+  proxy:
+    driver: bridge
+    ipam:
+      config:
+        - subnet: ${SUBNET:-192.168.178.0/24}
+          gateway: ${GATEWAY:-192.168.178.1}
+
+volumes:
+  portainer_data:
